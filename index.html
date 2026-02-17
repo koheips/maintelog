@@ -4,13 +4,277 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>メンテログ</title>
+
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#0b0b0b" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+
+  <style>
+    :root {
+      --bg:#0b0b0b;
+      --card:#141414;
+      --muted:#b6b6b6;
+      --fg:#f2f2f2;
+      --accent:#4f9cff;
+      --line:#262626;
+      --panel:#0f0f0f;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+
+    header { position:sticky; top:0; z-index:10; padding:12px 14px; background:rgba(11,11,11,0.92); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); }
+    header .top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    header h1 { margin:0; font-size:16px; letter-spacing:0.04em; }
+    header .meta { margin-top:6px; font-size:12px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; }
+
+    main { max-width:980px; margin:0 auto; padding:12px 12px 96px; }
+
+    .tabs { display:flex; gap:8px; }
+    .tabbtn { padding:10px 12px; border-radius:999px; border:1px solid var(--line); background:#101010; color:var(--fg); font-size:13px; }
+    .tabbtn.active { background:var(--accent); color:#06111f; border-color:transparent; font-weight:700; }
+
+    .grid { display:grid; gap:12px; }
+    @media (min-width:860px){ .grid { grid-template-columns: 1fr 1fr; align-items:start; } }
+
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; }
+    .card h2 { margin:0 0 10px; font-size:14px; }
+
+    label { font-size:12px; color:var(--muted); display:block; margin-bottom:6px; }
+
+    input[type="date"], input[type="number"], input[type="text"], textarea, select {
+      width:100%; padding:12px; border-radius:12px; border:1px solid var(--line);
+      background:var(--panel); color:var(--fg); font-size:16px; outline:none;
+    }
+    textarea { min-height:92px; resize:vertical; }
+
+    .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    button {
+      border:1px solid var(--line); background:#101010; color:var(--fg);
+      padding:12px 14px; border-radius:12px; font-size:14px;
+    }
+    button.primary { background:var(--accent); border-color:transparent; color:#06111f; font-weight:700; }
+    button.danger { background:#2a1010; border-color:#3a1717; color:#ffd7d7; }
+    button.ghost { background:var(--panel); }
+
+    .small { font-size:12px; color:var(--muted); }
+    .hr { height:1px; background:var(--line); margin:12px 0; }
+
+    .chips { display:flex; flex-wrap:wrap; gap:10px; }
+    .chip {
+      padding:12px 14px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:var(--panel);
+      display:flex;
+      gap:10px;
+      align-items:center;
+      user-select:none;
+      font-size:16px;
+    }
+    .chip input { width:22px; height:22px; }
+    .chip span { font-size:17px; }
+
+    .groupTitle { margin:12px 0 8px; font-size:12px; color:var(--muted); letter-spacing:0.06em; }
+
+    .tablewrap { overflow:auto; border-radius:12px; border:1px solid var(--line); }
+    table { width:100%; border-collapse:collapse; background:var(--panel); min-width:720px; }
+    th, td { padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { position:sticky; top:0; background:#111; font-size:12px; color:var(--muted); text-align:left; }
+    tr:last-child td { border-bottom:none; }
+
+    .pill {
+      display:inline-flex;
+      align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      font-size:12px;
+      margin-right:6px;
+      margin-bottom:6px;
+      white-space:nowrap;
+    }
+    .muted { color:var(--muted); }
+    .right { text-align:right; }
+
+    .footerbar { position:fixed; left:0; right:0; bottom:0; padding:10px 12px; background:rgba(11,11,11,0.92); backdrop-filter: blur(10px); border-top:1px solid var(--line); }
+    .footerbar .wrap { max-width:980px; margin:0 auto; display:flex; gap:10px; }
+    .footerbar button { flex:1; }
+
+    .masterlist { display:flex; flex-direction:column; gap:10px; }
+    .masteritem { border:1px solid var(--line); background:var(--panel); border-radius:12px; padding:10px; }
+    .masterhead { display:flex; align-items:center; gap:10px; }
+    .masterhead .name { flex:1; font-size:16px; font-weight:700; }
+    .mastercontrols { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .tinybtn { padding:8px 10px; font-size:12px; border-radius:10px; }
+
+    .hintbox { border:1px solid var(--line); background:var(--panel); border-radius:12px; padding:10px 12px; }
+
+    .recbox { border:1px solid var(--line); background:var(--panel); border-radius:12px; padding:12px; }
+    .recbox h3 { margin:0 0 8px; font-size:13px; }
+    .recrow { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px dashed var(--line); }
+    .recrow:last-child { border-bottom:none; }
+    .recrow .left { display:flex; align-items:center; gap:10px; }
+    .recrow .when { font-size:12px; color:var(--muted); }
+
+    .toast { position:fixed; left:12px; right:12px; bottom:84px; max-width:980px; margin:0 auto; display:none; }
+    .toast .inner { border:1px solid var(--line); background:rgba(15,15,15,0.96); backdrop-filter: blur(10px); border-radius:14px; padding:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  </style>
 </head>
 <body>
-  <h1>メンテログ</h1>
-  <p>このzipは再配布用です</p>
-  <script src="./app.js"></script>
+<header>
+  <div class="top">
+    <h1 id="appTitle">メンテログ</h1>
+    <div class="tabs">
+      <button id="tabInput" class="tabbtn active" type="button">入力</button>
+      <button id="tabHistory" class="tabbtn" type="button">履歴</button>
+    </div>
+  </div>
+  <div class="meta">
+    <div id="status"></div>
+    <div class="muted">保存先 端末内</div>
+  </div>
+</header>
+
+<main>
+  <section id="viewInput" class="grid">
+    <div class="card">
+      <h2>滞在ログ入力</h2>
+
+      <div class="row2">
+        <div>
+          <label>日付 必須</label>
+          <input id="date" type="date" />
+        </div>
+        <div>
+          <label>泊数 任意</label>
+          <input id="nights" type="number" min="0" inputmode="numeric" placeholder="例 2" />
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label>作業内容 選択</label>
+        <div id="taskGroups"></div>
+        <div class="small">複数選択可能</div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label>その他 手入力</label>
+        <textarea id="other" placeholder="例 灯油 残 3/4"></textarea>
+      </div>
+
+      <div class="actions">
+        <button id="save" class="primary" type="button">保存</button>
+        <button id="clear" class="ghost" type="button">入力クリア</button>
+        <button id="wipe" class="danger" type="button">全データ削除</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="row2">
+        <div>
+          <label>バックアップ</label>
+          <button id="export" type="button">JSON保存</button>
+        </div>
+        <div>
+          <label>復元</label>
+          <input id="import" type="file" accept="application/json" />
+        </div>
+      </div>
+
+      <div class="small">端末移行はJSONで対応</div>
+    </div>
+
+    <div class="card">
+      <h2>設定 と 選択肢マスター</h2>
+
+      <div class="row2">
+        <div>
+          <label>アプリ名</label>
+          <input id="appName" type="text" placeholder="例 メンテログ" />
+        </div>
+        <div style="display:flex; align-items:end">
+          <button id="saveAppName" class="primary" type="button" style="width:100%">保存</button>
+        </div>
+      </div>
+      <div class="small">端末内表示のみ 追加したホーム画面の名称は manifest 編集が必要</div>
+
+      <div class="hr"></div>
+
+      <div class="hintbox small">
+        ここで追加した項目が入力画面の選択肢に出る
+        推奨頻度 日数 を入れると 履歴画面で 次回推奨作業 を表示
+      </div>
+
+      <div style="margin-top:10px" class="row2">
+        <div>
+          <label>新規追加</label>
+          <input id="newTask" type="text" placeholder="例 トイレマット洗濯" />
+        </div>
+        <div style="display:flex; align-items:end">
+          <button id="addTask" class="primary" type="button" style="width:100%">追加</button>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div id="master" class="masterlist"></div>
+      <div class="small">削除すると過去の記録は残るが 次回選択肢から消える</div>
+    </div>
+  </section>
+
+  <section id="viewHistory" style="display:none">
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap">
+        <h2 style="margin:0">履歴一覧</h2>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button id="sortDesc" type="button">日付 新しい順</button>
+          <button id="sortAsc" type="button">日付 古い順</button>
+          <button id="goInput" class="primary" type="button">入力へ</button>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div id="recommend" class="recbox" style="margin-bottom:12px"></div>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:140px">日付</th>
+              <th style="width:90px">泊数</th>
+              <th>作業内容</th>
+              <th style="width:120px" class="right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+
+      <div class="small" style="margin-top:10px">削除は行単位</div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast">
+  <div class="inner">
+    <div class="small" id="toastText"></div>
+    <div style="display:flex; gap:8px">
+      <button id="toastReload" class="primary" type="button">更新</button>
+      <button id="toastClose" type="button">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="footerbar">
+  <div class="wrap">
+    <button id="footInput" type="button">入力</button>
+    <button id="footHistory" type="button">履歴</button>
+  </div>
+</div>
+
+<script src="./app.js"></script>
 </body>
 </html>
