@@ -3,14 +3,14 @@
   キャッシュ名に版を含め 更新で旧キャッシュを破棄
 */
 
-const CACHE_VERSION = "maintelog_cache_2026-02-06_v3";
+const CACHE_VERSION = "maintelog_cache_2026-02-17_v3fix";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./app.js",
   "./manifest.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
+  "./icon-192.png",
+  "./icon-512.png",
 ];
 
 self.addEventListener("install", (event) => {

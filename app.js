@@ -11,7 +11,7 @@
   ・tasks が旧形式 文字列配列 の場合は 読み込み時にオブジェクトへ昇格
 */
 
-const BUILD_ID = "2026-02-06_v3";
+const BUILD_ID = "2026-02-17_v3fix";
 
 const STORAGE_KEY = "maintelog_rows_v2";
 const TASKS_KEY = "maintelog_tasks_v2";
