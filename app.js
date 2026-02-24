@@ -457,17 +457,24 @@ function renderHistory() {
 
     const pills = parts.map(p => {
       const style = taskStyleByName(p);
+
+      // iPhoneで縦割れしないように バッジ内は折り返さない
+      const base = `display:inline-flex;align-items:center;justify-content:center;` +
+                   `white-space:nowrap;word-break:keep-all;overflow-wrap:normal;` +
+                   `writing-mode:horizontal-tb;line-height:1.1;` +
+                   `padding:6px 10px;border-radius:999px;`;
+
       if (style) {
-        return `<span class="pill" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(p)}</span>`;
+        return `<span class="pill" style="${base}background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(p)}</span>`;
       }
-      return `<span class="pill">${escapeHtml(p)}</span>`;
+      return `<span class="pill" style="${base}">${escapeHtml(p)}</span>`;
     }).join("");
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(dateTxt)}</td>
       <td>${escapeHtml(nightsTxt)}</td>
-      <td>${pills || `<span class="muted">空</span>`}</td>
+      <td><div class=\"history-tags\" style=\"display:flex;flex-wrap:wrap;gap:10px;align-items:center\">${pills || `<span class=\"muted\">空</span>`}</div></td>
       <td class="right"><button data-del="${escapeHtml(r.id)}" type="button">削除</button></td>
     `;
     body.appendChild(tr);
