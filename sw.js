@@ -1,16 +1,16 @@
+const CACHE_NAME = 'maintelog-cache-v2026-02-24-1';
 // メンテログ service worker
 // キャッシュ更新対策として version 付きキャッシュ名を使用
 const CACHE_PREFIX = "maintelog_cache_";
-const CACHE_NAME = CACHE_PREFIX + "maintelog_cache_v4_20260218023801";
+const CACHE_NAME = CACHE_PREFIX + "v3_20260217055726";
 
 const ASSETS = [
   "./",
   "./index.html",
   "./app.js",
   "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png",
-  "./apple-touch-icon.png"
+  "./icons/icon-192.png",
+  "./icons/icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {

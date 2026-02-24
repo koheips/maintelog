@@ -146,37 +146,14 @@
     }
     .footbar button { flex:1; }
   
-    .fileHidden{
-      position:absolute !important;
-      width:1px !important;
-      height:1px !important;
-      padding:0 !important;
-      margin:-1px !important;
-      overflow:hidden !important;
-      clip:rect(0,0,0,0) !important;
-      white-space:nowrap !important;
-      border:0 !important;
-    }
-    select, option { font-size: var(--fs); }
-    .modalOverlay{
-      position:fixed; inset:0;
-      background:rgba(0,0,0,0.55);
-      display:none;
-      z-index:9999;
-      padding:18px;
-    }
-    .modalOverlay.show{ display:flex; align-items:center; justify-content:center; }
-    .modalCard{
-      width:min(560px, 100%);
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      padding:16px;
-    }
-    .modalHead{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
-    .modalHead h3{ margin:0; font-size:var(--fsBig); }
-    .modalGrid{ display:grid; grid-template-columns:1fr; gap:10px; }
-    .modalActions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    .chip input[type="file"]{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999}
+    .overlay.hidden{display:none}
+    .modal{width:min(520px,92vw);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .modal h3{margin:0 0 10px 0;font-size:18px}
+    .modal .grid{display:grid;grid-template-columns:1fr;gap:10px}
+    .modal input,.modal select{width:100%;font-size:16px;padding:10px;border-radius:10px;border:1px solid var(--line);background:#0f0f0f;color:var(--fg)}
+    .modal .btnrow{display:flex;gap:10px;justify-content:flex-end;margin-top:10px}
 
   </style>
 </head>
@@ -220,8 +197,8 @@
         <div class="btnrow" style="margin-top:10px">
           <button id="export" type="button">JSONエクスポート</button>
           <label class="chip" style="padding:10px 12px">
-            <input id="import" class="fileHidden" type="file" accept="application/json" />
-            <span>JSONインポート</span>
+            <input id="import" type="file" accept="application/json" />
+            <span style="font-size:16px">JSONインポート</span>
           </label>
         </div>
 
@@ -344,36 +321,13 @@
 
   <script src="./app.js"></script>
 
-  <div id="editModal" class="modalOverlay" aria-hidden="true">
-    <div class="modalCard" role="dialog" aria-modal="true">
-      <div class="modalHead">
-        <h3>作業マスター編集</h3>
-        <button id="editClose" class="small" type="button">閉じる</button>
-      </div>
-
-      <div class="modalGrid">
-        <div class="row">
-          <div class="col">
-            <label for="editName">項目名</label>
-            <input id="editName" type="text" autocomplete="off" />
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <label for="editCat">区分</label>
-            <select id="editCat"></select>
-          </div>
-          <div class="col">
-            <label for="editFreq">推奨頻度 日数</label>
-            <input id="editFreq" type="number" inputmode="numeric" placeholder="未設定" />
-          </div>
-        </div>
-      </div>
-
-      <div class="modalActions">
-        <button id="editSave" type="button">保存</button>
-        <button id="editCancel" class="danger" type="button">キャンセル</button>
+  <div id="modalOverlay" class="overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h3 id="modalTitle">編集</h3>
+      <div id="modalBody" class="grid"></div>
+      <div class="btnrow">
+        <button id="modalCancel" type="button">キャンセル</button>
+        <button id="modalOk" class="primary" type="button">OK</button>
       </div>
     </div>
   </div>

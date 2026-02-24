@@ -14,85 +14,6 @@ const APPNAME_KEY = "maintelog_appname_v3";
 
 const CATS = ["掃除", "洗濯", "その他"];
 
-let editIndex = null;
-
-function initEditModal() {
-  const sel = $("editCat");
-  if (sel && sel.options.length === 0) {
-    CATS.forEach(c => {
-      const o = document.createElement("option");
-      o.value = c;
-      o.textContent = c;
-      sel.appendChild(o);
-    });
-  }
-
-  $("editClose")?.addEventListener("click", closeEditModal);
-  $("editCancel")?.addEventListener("click", closeEditModal);
-  $("editModal")?.addEventListener("click", (e) => {
-    if (e.target && e.target.id === "editModal") closeEditModal();
-  });
-  $("editSave")?.addEventListener("click", saveEditModal);
-}
-
-function openEditModal(index) {
-  const tasks = loadTasks();
-  const t = tasks[index];
-  if (!t) return;
-  editIndex = index;
-
-  $("editName").value = t.name ?? "";
-  $("editCat").value = CATS.includes(t.cat) ? t.cat : "その他";
-  $("editFreq").value = (t.freqDays && t.freqDays > 0) ? String(t.freqDays) : "";
-
-  const modal = $("editModal");
-  modal.classList.add("show");
-  modal.setAttribute("aria-hidden", "false");
-
-  setTimeout(() => {
-    $("editName")?.focus();
-    $("editName")?.select();
-  }, 0);
-}
-
-function closeEditModal() {
-  editIndex = null;
-  const modal = $("editModal");
-  modal.classList.remove("show");
-  modal.setAttribute("aria-hidden", "true");
-}
-
-function saveEditModal() {
-  if (editIndex === null) return;
-
-  const tasks2 = loadTasks();
-  const t = tasks2[editIndex];
-  if (!t) { closeEditModal(); return; }
-
-  const nm = String($("editName").value ?? "").trim();
-  if (nm.length === 0) return;
-
-  const cat = String($("editCat").value ?? "").trim();
-  const ct = CATS.includes(cat) ? cat : "その他";
-
-  const fd = normalizeIntOrNull(String($("editFreq").value ?? "").trim());
-  const freqDays = (fd && fd > 0) ? fd : null;
-
-  const exists = tasks2.find((x, idx) => idx !== editIndex && x.name === nm);
-  if (exists) {
-    alert("同名が既に存在");
-    return;
-  }
-
-  tasks2[editIndex] = { ...t, name: nm, cat: ct, freqDays };
-  saveTasks(tasks2);
-
-  closeEditModal();
-  renderTaskChips();
-  renderMaster();
-  renderReco();
-}
-
 const defaultTaskNames = [
   "拭き掃除",
   "掃除機",
@@ -103,6 +24,120 @@ const defaultTaskNames = [
 ];
 
 const $ = (id) => document.getElementById(id);
+
+
+
+function openModal(opts) {
+  const ov = $("modalOverlay");
+  const body = $("modalBody");
+  const ttl = $("modalTitle");
+  const okBtn = $("modalOk");
+  const cancelBtn = $("modalCancel");
+
+  ttl.textContent = opts.title || "";
+  body.innerHTML = "";
+
+  if (opts.bodyNodes) {
+    opts.bodyNodes.forEach(n => body.appendChild(n));
+  }
+
+  okBtn.textContent = opts.okText || "OK";
+  cancelBtn.textContent = opts.cancelText || "キャンセル";
+
+  cancelBtn.style.display = opts.hideCancel ? "none" : "";
+  document.body.style.overflow = "hidden";
+  ov.classList.remove("hidden");
+
+  const cleanup = () => {
+    okBtn.onclick = null;
+    cancelBtn.onclick = null;
+    ov.classList.add("hidden");
+    cancelBtn.style.display = "";
+    document.body.style.overflow = "";
+  };
+
+  okBtn.onclick = () => { cleanup(); opts.onOk && opts.onOk(); };
+  cancelBtn.onclick = () => { cleanup(); opts.onCancel && opts.onCancel(); };
+
+  const first = body.querySelector("input,select,textarea,button");
+  if (first) setTimeout(() => first.focus(), 50);
+}
+
+function showModal(title, fields, onOk, onCancel) {
+  const nodes = [];
+  const values = {};
+  fields.forEach(f => {
+    const wrap = document.createElement("div");
+    const lab = document.createElement("label");
+    lab.textContent = f.label;
+    lab.style.display = "block";
+    lab.style.marginBottom = "6px";
+    wrap.appendChild(lab);
+
+    let el;
+    if (f.type === "select") {
+      el = document.createElement("select");
+      (f.options || []).forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        if (opt === f.value) o.selected = true;
+        el.appendChild(o);
+      });
+    } else {
+      el = document.createElement("input");
+      el.type = f.type || "text";
+      el.value = f.value ?? "";
+      if (f.placeholder) el.placeholder = f.placeholder;
+      if (f.inputmode) el.inputMode = f.inputmode;
+    }
+    el.id = f.id;
+    wrap.appendChild(el);
+    nodes.push(wrap);
+    values[f.id] = el;
+  });
+
+  openModal({
+    title,
+    bodyNodes: nodes,
+    onOk: () => {
+      const out = {};
+      fields.forEach(f => out[f.id] = values[f.id].value);
+      onOk && onOk(out);
+    },
+    onCancel: () => { onCancel && onCancel(); }
+  });
+}
+
+function showConfirm(title, message, onYes, onNo) {
+  const p = document.createElement("div");
+  p.textContent = message;
+  p.style.fontSize = "16px";
+  p.style.lineHeight = "1.4";
+  openModal({
+    title,
+    bodyNodes:[p],
+    okText:"OK",
+    cancelText:"キャンセル",
+    onOk: () => { onYes && onYes(); },
+    onCancel: () => { onNo && onNo(); }
+  });
+}
+
+function showAlert(title, message, onClose) {
+  const p = document.createElement("div");
+  p.textContent = message;
+  p.style.fontSize = "16px";
+  p.style.lineHeight = "1.4";
+  openModal({
+    title,
+    bodyNodes:[p],
+    okText:"閉じる",
+    hideCancel:true,
+    onOk: () => { onClose && onClose(); },
+    onCancel: () => { onClose && onClose(); }
+  });
+}
 
 function todayISO() {
   const d = new Date();
@@ -442,9 +477,7 @@ function renderHistory() {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del");
       if (!id) return;
-      const ok = confirm("この行を削除");
-      if (!ok) return;
-      deleteRow(id);
+      showConfirm("確認","この行を削除", () => { deleteRow(id); renderStatus(); renderHistory(); renderReco(); }, () => {}); return;
       renderStatus();
       renderHistory();
       renderReco();
@@ -494,13 +527,7 @@ function renderMaster() {
       const tasks2 = loadTasks();
       const target = tasks2[i];
       if (!target) return;
-      const ok = confirm("選択肢を削除");
-      if (!ok) return;
-      tasks2.splice(i, 1);
-      saveTasks(tasks2);
-      renderTaskChips();
-      renderMaster();
-      renderReco();
+      showConfirm("確認","選択肢を削除", () => { tasks2.splice(i,1); saveTasks(tasks2); renderTaskChips(); renderMaster(); renderReco(); }, () => {}); return;
     });
   });
 
@@ -537,7 +564,33 @@ function renderMaster() {
     btn.addEventListener("click", () => {
       const i = Number(btn.getAttribute("data-edit"));
       if (!Number.isFinite(i)) return;
-      openEditModal(i);
+      const tasks2 = loadTasks();
+      const t = tasks2[i];
+      if (!t) return;
+
+      showModal("項目を編集", [
+        {id:"name", label:"項目名", type:"text", value:t.name},
+        {id:"cat", label:"区分", type:"select", value:t.cat, options:CATS},
+        {id:"freq", label:"推奨頻度 日数 空欄で未設定", type:"number", value:(t.freqDays && t.freqDays>0)?String(t.freqDays):"", inputmode:"numeric"}
+      ], (out) => {
+        const nm = String(out.name ?? "").trim();
+        if (nm.length === 0) return;
+        const ct = CATS.includes(String(out.cat).trim()) ? String(out.cat).trim() : "その他";
+        const fd = normalizeIntOrNull(String(out.freq ?? "").trim());
+        const freqDays = (fd && fd > 0) ? fd : null;
+
+        const exists = tasks2.find((x, idx) => idx !== i && x.name === nm);
+        if (exists) {
+          showAlert("確認", "同名が既に存在");
+          return;
+        }
+
+        tasks2[i] = { ...t, name: nm, cat: ct, freqDays };
+        saveTasks(tasks2);
+        renderTaskChips();
+        renderMaster();
+        renderReco();
+      }, () => {});
     });
   });
 
@@ -585,7 +638,7 @@ function addTaskFromInputs() {
   const tasks = loadTasks();
   const exists = tasks.find(t => t.name === name);
   if (exists) {
-    alert("同名が既に存在");
+    showAlert("確認", "同名が既に存在");
     return;
   }
 
@@ -726,9 +779,9 @@ function importJSON(file) {
       }
 
       boot();
-      alert("復元完了");
+      showAlert("確認", "復元完了");
     } catch {
-      alert("読み込み失敗");
+      showAlert("確認", "読み込み失敗");
     }
   };
   reader.readAsText(file);
@@ -782,7 +835,7 @@ $("save").addEventListener("click", () => {
   const other = $("other").value || "";
 
   if (!date) {
-    alert("日付は必須");
+    showAlert("確認", "日付は必須");
     return;
   }
   if (tasks.length === 0 && String(other).trim().length === 0 && (nights === null)) {
@@ -798,12 +851,12 @@ $("save").addEventListener("click", () => {
 $("clear").addEventListener("click", () => clearInput());
 
 $("wipe").addEventListener("click", () => {
-  const ok = confirm("全データ削除");
-  if (!ok) return;
-  saveRows([]);
-  saveTasks(ensureDefaultTasks());
-  localStorage.removeItem(APPNAME_KEY);
-  boot();
+  showConfirm("確認","全データ削除", () => {
+    saveRows([]);
+    saveTasks(ensureDefaultTasks());
+    localStorage.removeItem(APPNAME_KEY);
+    boot();
+  }, () => {});
 });
 
 $("addTask").addEventListener("click", () => addTaskFromInputs());
@@ -828,7 +881,7 @@ $("import").addEventListener("change", (e) => {
 $("saveAppName").addEventListener("click", () => {
   saveAppName($("appName").value);
   applyAppName();
-  alert("保存完了");
+  showAlert("確認", "保存完了");
 });
 $("resetAppName").addEventListener("click", () => {
   localStorage.removeItem(APPNAME_KEY);
@@ -841,5 +894,4 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-initEditModal();
 boot();
