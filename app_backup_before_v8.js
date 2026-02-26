@@ -176,85 +176,6 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-/* v8 lane history UI
-   ・履歴を 掃除 洗濯 その他 の3レーンで縦積み
-   ・各レーン内のみ横スクロール 省略なし 折り返しなし
-   ・既存UIの他部分は変更しない
-*/
-function ensureStylesV8() {
-  if (document.getElementById("styles_v8")) return;
-  const css = `
-    .histLanesV8{ display:grid; gap:14px; }
-    .histLaneV8{ display:block; }
-    .histLaneScrollV8{
-      position:relative;
-      display:flex;
-      flex-wrap:nowrap;
-      gap:12px;
-      overflow-x:auto;
-      -webkit-overflow-scrolling:touch;
-      padding:6px 6px;
-      scrollbar-width:thin;
-      scroll-snap-type:x proximity;
-    }
-    .histLaneScrollV8::after{
-      content:"";
-      position:sticky;
-      right:0;
-      width:22px;
-      height:100%;
-      margin-left:auto;
-      pointer-events:none;
-      background:linear-gradient(to left, rgba(0,0,0,0.8), rgba(0,0,0,0));
-    }
-    .histCardV8{
-      flex:0 0 auto;
-      min-width:240px;
-      max-width:86vw;
-      border:1px solid rgba(255,255,255,0.10);
-      background:rgba(255,255,255,0.03);
-      border-radius:18px;
-      padding:12px;
-      scroll-snap-align:start;
-    }
-    .histMetaV8{
-      display:flex;
-      justify-content:space-between;
-      align-items:baseline;
-      gap:10px;
-      margin-bottom:10px;
-      white-space:nowrap;
-    }
-    .histPillsV8{
-      display:flex;
-      flex-wrap:nowrap;
-      gap:8px;
-      white-space:nowrap;
-      overflow:hidden;
-    }
-    .histActionsV8{
-      display:flex;
-      justify-content:flex-end;
-      margin-top:10px;
-    }
-    .pillV8{
-      display:inline-flex;
-      align-items:center;
-      white-space:nowrap;
-      word-break:keep-all;
-      overflow-wrap:normal;
-      padding:5px 10px;
-      border-radius:999px;
-      line-height:1.1;
-    }
-  `;
-  const st = document.createElement("style");
-  st.id = "styles_v8";
-  st.textContent = css;
-  document.head.appendChild(st);
-}
-
-
 function clampColor(hex, fallback) {
   if (typeof hex !== "string") return fallback;
   const v = hex.trim();
@@ -513,8 +434,6 @@ function taskStyleByName(name) {
 let sortMode = "desc";
 
 function renderHistory() {
-  ensureStylesV8();
-
   const rows = loadRows().slice();
   rows.sort((a, b) => {
     const ad = String(a.date ?? "");
@@ -531,87 +450,37 @@ function renderHistory() {
     return;
   }
 
-  const cats = ["掃除","洗濯","その他"]; // 固定3レーン
-  const tasks = loadTasks();
-
-  function taskCatByName(name) {
-    const hit = tasks.find(t => t.name === name);
-    const c = hit ? String(hit.cat ?? "").trim() : "";
-    if (c === "掃除" || c === "洗濯" || c === "その他") return c;
-    return "その他";
-  }
-
-  const laneCards = { "掃除": [], "洗濯": [], "その他": [] };
-
   rows.forEach(r => {
-    const taskNames = Array.isArray(r.tasks) ? r.tasks : [];
-    const per = { "掃除": [], "洗濯": [], "その他": [] };
+    const dateTxt = r.date ? formatJP(r.date) : "日付不明";
+    const nightsTxt = (r.nights === 0 || r.nights) ? String(r.nights) : "";
+    const parts = rowSummaryParts(r);
 
-    taskNames.forEach(nm => {
-      const c = taskCatByName(nm);
-      per[c].push(nm);
-    });
+    const pills = parts.map(p => {
+      const style = taskStyleByName(p);
+      if (style) {
+        return `<span class="pill" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(p)}</span>`;
+      }
+      return `<span class="pill">${escapeHtml(p)}</span>`;
+    }).join("");
 
-    const other = String(r.other ?? "").trim();
-    if (other) per["その他"].push(other);
-
-    cats.forEach(c => {
-      const items = per[c];
-      if (!items || items.length === 0) return;
-
-      const dateTxt = r.date ? formatJP(r.date) : "日付不明";
-      const nightsTxt = (r.nights === 0 || r.nights) ? String(r.nights) : "";
-
-      const pills = items.map(name => {
-        const style = taskStyleByName(name);
-        const cls = "pillV8";
-        if (style) return `<span class="${cls}" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(name)}</span>`;
-        return `<span class="${cls}">${escapeHtml(name)}</span>`;
-      }).join("");
-
-      laneCards[c].push(`
-        <div class="histCardV8">
-          <div class="histMetaV8">
-            <span>${escapeHtml(dateTxt)}</span>
-            <span class="muted">${escapeHtml(nightsTxt)}泊</span>
-          </div>
-          <div class="histPillsV8">${pills}</div>
-          <div class="histActionsV8">
-            <button type="button" data-del="${escapeHtml(r.id)}">削除</button>
-          </div>
-        </div>
-      `);
-    });
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(dateTxt)}</td>
+      <td>${escapeHtml(nightsTxt)}</td>
+      <td>${pills || `<span class="muted">空</span>`}</td>
+      <td class="right"><button data-del="${escapeHtml(r.id)}" type="button">削除</button></td>
+    `;
+    body.appendChild(tr);
   });
-
-  const blocks = cats.map(c => {
-    const cards = laneCards[c];
-    if (!cards || cards.length === 0) return ""; // 空レーンは非表示
-    return `<div class="histLaneV8"><div class="histLaneScrollV8">${cards.join("")}</div></div>`;
-  }).filter(Boolean).join("");
-
-  body.innerHTML = `<tr><td colspan="4"><div class="histLanesV8">${blocks || ""}</div></td></tr>`;
 
   Array.from(body.querySelectorAll("button[data-del]")).forEach(btn => {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del");
       if (!id) return;
-      // 既存の確認UIがある場合はそれを優先
-      if (typeof showConfirm === "function") {
-        showConfirm("確認", "この行を削除", () => {
-          deleteRow(id);
-          renderStatus();
-          renderHistory();
-          renderReco();
-        }, () => {});
-      } else {
-        const ok = window.confirm("この行を削除しますか");
-        if (!ok) return;
-        deleteRow(id);
-        renderStatus();
-        renderHistory();
-        renderReco();
-      }
+      showConfirm("確認","この行を削除", () => { deleteRow(id); renderStatus(); renderHistory(); renderReco(); }, () => {}); return;
+      renderStatus();
+      renderHistory();
+      renderReco();
     });
   });
 }

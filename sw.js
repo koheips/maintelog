@@ -1,5 +1,5 @@
-/* maintelog sw v7 */
-const CACHE_NAME = "maintelog-v7-2026-02-26-1";
+/* maintelog sw v8 */
+const CACHE_NAME = "maintelog-v8-2026-02-26-1";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -14,7 +14,7 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(CORE_ASSETS.map(u => new Request(u, {cache: "reload"})));
+    await cache.addAll(CORE_ASSETS.map(u => new Request(u, { cache: "reload" })));
   })());
 });
 
@@ -31,7 +31,7 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
-    const cached = await cache.match(req, {ignoreSearch: true});
+    const cached = await cache.match(req, { ignoreSearch: true });
     if (cached) return cached;
 
     try {
@@ -41,7 +41,7 @@ self.addEventListener("fetch", (event) => {
         cache.put(req, res.clone());
       }
       return res;
-    } catch (_) {
+    } catch (e) {
       return cached || Response.error();
     }
   })());
