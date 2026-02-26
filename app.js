@@ -12,7 +12,52 @@ const STORAGE_KEY = "maintelog_rows_v2";      // 互換維持
 const TASKS_KEY = "maintelog_tasks_v2";       // 互換維持
 const APPNAME_KEY = "maintelog_appname_v3";
 
-const CATS = ["掃除", "洗濯", "その他"];
+const CATS_KEY = "maintelog_cats_v1";          // 新規 既存と衝突しない
+
+const DEFAULT_CATS = ["掃除", "洗濯", "その他"];
+
+function loadCats() {
+  try {
+    const raw = localStorage.getItem(CATS_KEY);
+    if (!raw) return DEFAULT_CATS.slice();
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr) && arr.length > 0) {
+      // 文字列のみ、重複除去、空除去
+      const out = [];
+      const seen = new Set();
+      arr.forEach(v => {
+        const s = String(v ?? "").trim();
+        if (!s) return;
+        if (seen.has(s)) return;
+        seen.add(s);
+        out.push(s);
+      });
+      return out.length > 0 ? out : DEFAULT_CATS.slice();
+    }
+    return DEFAULT_CATS.slice();
+  } catch (_) {
+    return DEFAULT_CATS.slice();
+  }
+}
+
+function saveCats(cats) {
+  const out = [];
+  const seen = new Set();
+  (cats || []).forEach(v => {
+    const s = String(v ?? "").trim();
+    if (!s) return;
+    if (seen.has(s)) return;
+    seen.add(s);
+    out.push(s);
+  });
+  localStorage.setItem(CATS_KEY, JSON.stringify(out.length ? out : DEFAULT_CATS.slice()));
+}
+
+function getCats() {
+  return loadCats();
+}
+
+const CATS = DEFAULT_CATS.slice();
 
 const defaultTaskNames = [
   "拭き掃除",
@@ -174,19 +219,18 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
 
-
-/* v4 UI patches
-  ・履歴を 掃除 洗濯 その他 の3レーン表示へ
-  ・各レーン内のみ横スクロールで全件表示
-  ・作業内容マスターと辞書編集UIを折りたたみ
-  ・削除確認ボタン文言を明示
+/* v5 UI patches
+  ・履歴を 区分ごとの3レーンへ分割し レーン単位で横スクロール
+  ・作業内容の縦積み禁止 折り返し禁止
+  ・作業内容マスターと区分マスターを折りたたみ
+  ・画面下部の固定 入力/履歴 ボタンを非表示
 */
 
-function ensureDynamicStyles() {
-  if (document.getElementById("dynamicStyles_v4")) return;
+function ensureDynamicStylesV5() {
+  if (document.getElementById("dynamicStyles_v5")) return;
   const css = `
-    /* pills smaller + no vertical breaking */
     .pill{
       display:inline-flex;
       align-items:center;
@@ -198,31 +242,60 @@ function ensureDynamicStyles() {
       line-height:1.1;
     }
 
-    /* lanes inside history cell */
-    .lanes{
-      display:grid;
-      gap:8px;
-      min-width:0;
-    }
+    /* lane layout */
+    .laneBlock{ margin: 10px 0 18px; }
+    .laneTitle{ display:none; }
     .laneScroll{
       position:relative;
       display:flex;
       flex-wrap:nowrap;
-      gap:8px;
+      gap:12px;
       overflow-x:auto;
       -webkit-overflow-scrolling:touch;
-      padding:2px 0;
+      padding:6px 6px;
       scrollbar-width:thin;
     }
     .laneScroll::after{
       content:"";
       position:sticky;
       right:0;
-      width:18px;
+      width:22px;
       height:100%;
       margin-left:auto;
       pointer-events:none;
-      background:linear-gradient(to left, rgba(0,0,0,0.75), rgba(0,0,0,0));
+      background:linear-gradient(to left, rgba(0,0,0,0.8), rgba(0,0,0,0));
+    }
+
+    .histCard{
+      flex: 0 0 auto;
+      min-width: 220px;
+      max-width: 86vw;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.03);
+      border-radius: 18px;
+      padding: 12px;
+    }
+    .histMeta{
+      display:flex;
+      gap:10px;
+      align-items:baseline;
+      justify-content:space-between;
+      margin-bottom:10px;
+      white-space:nowrap;
+    }
+    .histMeta .date{ font-size:16px; }
+    .histMeta .nights{ opacity:0.8; font-size:14px; }
+    .histPills{
+      display:flex;
+      flex-wrap:nowrap;
+      gap:8px;
+      overflow:visible; /* card自体が横スクロールレーンで見える */
+      white-space:nowrap;
+    }
+    .histActions{
+      display:flex;
+      justify-content:flex-end;
+      margin-top:10px;
     }
 
     /* collapsibles */
@@ -233,27 +306,31 @@ function ensureDynamicStyles() {
       margin:10px 0;
       background:rgba(255,255,255,0.03);
     }
+    .miniToggle{
+      width:100%;
+      text-align:left;
+      margin:10px 0;
+    }
     .miniRow{
       display:flex;
       gap:10px;
       align-items:center;
       flex-wrap:wrap;
     }
-    .miniRow input[type=text]{
-      flex:1 1 160px;
-    }
-    .miniToggle{
-      width:100%;
-      text-align:left;
+    .miniRow input[type=text]{ flex:1 1 180px; }
+
+    /* hide fixed bottom nav buttons if exist */
+    #bottomNav, #bottomBar, #bottomButtons, .bottomNav, .bottomBar, .bottomButtons, .bottom-tabs, .bottomTabs, .fixedBottom, .stickyBottom{
+      display:none !important;
     }
   `;
   const st = document.createElement("style");
-  st.id = "dynamicStyles_v4";
+  st.id = "dynamicStyles_v5";
   st.textContent = css;
   document.head.appendChild(st);
 }
 
-function showDeleteConfirm(message, onYes, onNo) {
+function showDeleteConfirmV5(message, onYes, onNo) {
   const p = document.createElement("div");
   p.textContent = message;
   p.style.fontSize = "16px";
@@ -268,144 +345,19 @@ function showDeleteConfirm(message, onYes, onNo) {
   });
 }
 
-function getTaskCatByName(name) {
-  const tasks = loadTasks();
-  const hit = tasks.find(t => t.name === name);
-  return hit && CATS.includes(hit.cat) ? hit.cat : null;
-}
-
-function splitToLanes(row) {
-  const out = { "掃除": [], "洗濯": [], "その他": [] };
-
-  const tasks = Array.isArray(row.tasks) ? row.tasks : [];
-  tasks.forEach(nm => {
-    const cat = getTaskCatByName(nm) || "その他";
-    out[cat].push(nm);
-  });
-
-  const other = String(row.other ?? "").trim();
-  if (other.length > 0) out["その他"].push(other);
-
-  return out;
-}
-
-function renderPill(name) {
-  const style = taskStyleByName(name);
-  if (style) {
-    return `<span class="pill" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(name)}</span>`;
-  }
-  return `<span class="pill">${escapeHtml(name)}</span>`;
-}
-
-function renderLaneScroll(items) {
-  if (!items || items.length === 0) return "";
-  const pills = items.map(renderPill).join("");
-  return `<div class="laneScroll">${pills}</div>`;
-}
-
-function setupInputCollapsibles() {
-  // 辞書編集UI（最小）
-  const inputView = document.getElementById("viewInput") || document.body;
-
-  // 既に作成済みなら何もしない
-  if (!document.getElementById("dictPanel_v4")) {
-    const panel = document.createElement("div");
-    panel.id = "dictPanel_v4";
-    panel.className = "miniPanel";
-
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "miniToggle";
-    toggle.textContent = "辞書編集 表示";
-    toggle.style.marginBottom = "10px";
-
-    const body = document.createElement("div");
-    body.style.display = "none";
-
-    const row = document.createElement("div");
-    row.className = "miniRow";
-
-    const sel = document.createElement("select");
-    sel.id = "dictCat_v4";
-    CATS.forEach(c => {
-      const o = document.createElement("option");
-      o.value = c;
-      o.textContent = c;
-      sel.appendChild(o);
-    });
-
-    const inp = document.createElement("input");
-    inp.id = "dictTag_v4";
-    inp.type = "text";
-    inp.placeholder = "追加する作業名";
-
-    const add = document.createElement("button");
-    add.type = "button";
-    add.textContent = "追加";
-
-    row.appendChild(sel);
-    row.appendChild(inp);
-    row.appendChild(add);
-
-    const note = document.createElement("div");
-    note.className = "muted";
-    note.style.marginTop = "8px";
-    note.textContent = "既存と同名は追加しない、追加内容は端末内に保存";
-
-    body.appendChild(row);
-    body.appendChild(note);
-
-    toggle.addEventListener("click", () => {
-      const open = body.style.display !== "none";
-      body.style.display = open ? "none" : "";
-      toggle.textContent = open ? "辞書編集 表示" : "辞書編集 非表示";
-    });
-
-    add.addEventListener("click", () => {
-      const name = String(inp.value ?? "").trim();
-      const cat = String(sel.value ?? "").trim();
-      if (name.length === 0) return;
-
-      const tasks = loadTasks();
-      if (tasks.find(t => t.name === name)) {
-        showAlert("確認", "同名が既に存在");
-        return;
-      }
-      const ct = CATS.includes(cat) ? cat : "その他";
-      tasks.push({ name, cat: ct, freqDays: null, bg: "#0f0f0f", text: "#f0f0f0" });
-      saveTasks(tasks);
-      inp.value = "";
-      renderTaskChips();
-      renderMaster();
-      renderReco();
-      renderHistory();
-    });
-
-    panel.appendChild(toggle);
-    panel.appendChild(body);
-
-    // settings の前、要素が見つからなければ master の直前
-    const master = document.getElementById("master");
-    if (master && master.parentNode) {
-      master.parentNode.insertBefore(panel, master);
-    } else {
-      inputView.insertBefore(panel, inputView.firstChild);
-    }
-  }
-
+function setupMasterCollapsiblesV5() {
   // 作業内容マスター折りたたみ
   const master = document.getElementById("master");
-  if (master && !document.getElementById("masterWrap_v4")) {
+  if (master && !document.getElementById("masterWrap_v5")) {
     const wrap = document.createElement("div");
-    wrap.id = "masterWrap_v4";
+    wrap.id = "masterWrap_v5";
     wrap.style.display = "none";
 
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.id = "masterToggleBtn_v4";
+    btn.id = "masterToggleBtn_v5";
     btn.className = "miniToggle";
     btn.textContent = "作業内容マスター 表示";
-    btn.style.margin = "10px 0";
 
     master.parentNode.insertBefore(btn, master);
     master.parentNode.insertBefore(wrap, master);
@@ -417,8 +369,91 @@ function setupInputCollapsibles() {
       btn.textContent = open ? "作業内容マスター 表示" : "作業内容マスター 非表示";
     });
   }
+
+  // 区分マスター
+  const inputView = document.getElementById("viewInput") || document.body;
+  if (!document.getElementById("catMasterPanel_v5")) {
+    const panel = document.createElement("div");
+    panel.id = "catMasterPanel_v5";
+    panel.className = "miniPanel";
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "miniToggle";
+    toggle.textContent = "区分マスター 表示";
+
+    const body = document.createElement("div");
+    body.style.display = "none";
+
+    const row = document.createElement("div");
+    row.className = "miniRow";
+
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.placeholder = "区分名を追加";
+    inp.id = "catName_v5";
+
+    const add = document.createElement("button");
+    add.type = "button";
+    add.textContent = "追加";
+
+    row.appendChild(inp);
+    row.appendChild(add);
+
+    const list = document.createElement("div");
+    list.id = "catList_v5";
+    list.style.marginTop = "10px";
+
+    const render = () => {
+      const cats = getCats();
+      list.innerHTML = cats.map(c => `<span class="pill" style="margin-right:8px">${escapeHtml(c)}</span>`).join("");
+    };
+
+    add.addEventListener("click", () => {
+      const name = String(inp.value ?? "").trim();
+      if (!name) return;
+      const cats = getCats();
+      if (cats.includes(name)) {
+        showAlert("確認", "同名が既に存在");
+        return;
+      }
+      cats.push(name);
+      saveCats(cats);
+      inp.value = "";
+      render();
+      // 区分選択UIの再描画
+      renderTaskChips();
+      renderMaster();
+      renderReco();
+      renderHistory();
+    });
+
+    toggle.addEventListener("click", () => {
+      const open = body.style.display !== "none";
+      body.style.display = open ? "none" : "";
+      toggle.textContent = open ? "区分マスター 表示" : "区分マスター 非表示";
+    });
+
+    body.appendChild(row);
+    body.appendChild(list);
+    panel.appendChild(toggle);
+    panel.appendChild(body);
+
+    // 作業内容マスターの下に入れる
+    const masterWrap = document.getElementById("masterWrap_v5");
+    const masterToggleBtn = document.getElementById("masterToggleBtn_v5");
+    if (masterWrap && masterWrap.parentNode) {
+      masterWrap.parentNode.insertBefore(panel, masterWrap.nextSibling);
+    } else if (master && master.parentNode) {
+      master.parentNode.insertBefore(panel, master.nextSibling);
+    } else {
+      inputView.appendChild(panel);
+    }
+
+    render();
+  }
 }
-}
+
 
 function clampColor(hex, fallback) {
   if (typeof hex !== "string") return fallback;
@@ -595,7 +630,7 @@ function renderTaskChips() {
   const area = $("tasksArea");
   area.innerHTML = "";
 
-  CATS.forEach(cat => {
+  getCats().forEach(cat => {
     const items = byCat[cat] || [];
     const title = document.createElement("div");
     title.className = "groupTitle";
@@ -694,32 +729,78 @@ function renderHistory() {
     return;
   }
 
+  // 区分ごとの3レーン（初期3区分 + 追加区分）
+  const cats = getCats();
+  const lanes = {};
+  cats.forEach(c => lanes[c] = []);
+
+  const tasks = loadTasks();
+
+  function taskCatByName(name) {
+    const hit = tasks.find(t => t.name === name);
+    return hit && cats.includes(hit.cat) ? hit.cat : "その他";
+  }
+
+  // 各履歴を区分別に振り分け（同一履歴が複数レーンに出る）
   rows.forEach(r => {
-    const dateTxt = r.date ? formatJP(r.date) : "日付不明";
-    const nightsTxt = (r.nights === 0 || r.nights) ? String(r.nights) : "";
+    const taskNames = Array.isArray(r.tasks) ? r.tasks : [];
+    const byCat = {};
+    cats.forEach(c => byCat[c] = []);
+    taskNames.forEach(nm => {
+      const c = taskCatByName(nm);
+      if (!byCat[c]) byCat[c] = [];
+      byCat[c].push(nm);
+    });
 
-    const lanes = splitToLanes(r);
-    const laneHtml = [
-      renderLaneScroll(lanes["掃除"]),
-      renderLaneScroll(lanes["洗濯"]),
-      renderLaneScroll(lanes["その他"])
-    ].filter(Boolean).join("");
+    // other は その他へ
+    const other = String(r.other ?? "").trim();
+    if (other) {
+      if (!byCat["その他"]) byCat["その他"] = [];
+      byCat["その他"].push(other);
+    }
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(dateTxt)}</td>
-      <td>${escapeHtml(nightsTxt)}</td>
-      <td>${laneHtml ? `<div class="lanes">${laneHtml}</div>` : `<span class="muted">空</span>`}</td>
-      <td class="right"><button data-del="${escapeHtml(r.id)}" type="button">削除</button></td>
-    `;
-    body.appendChild(tr);
+    cats.forEach(c => {
+      if (byCat[c] && byCat[c].length) {
+        lanes[c].push({ row: r, items: byCat[c] });
+      }
+    });
   });
+
+  const laneBlocks = cats.map(cat => {
+    const items = lanes[cat] || [];
+    if (!items.length) return ""; // 該当ゼロのレーンは非表示
+    const cards = items.map(({row, items}) => {
+      const dateTxt = row.date ? formatJP(row.date) : "日付不明";
+      const nightsTxt = (row.nights === 0 || row.nights) ? String(row.nights) : "";
+      const pills = items.map(name => {
+        const style = taskStyleByName(name);
+        if (style) return `<span class="pill" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(name)}</span>`;
+        return `<span class="pill">${escapeHtml(name)}</span>`;
+      }).join("");
+      return `
+        <div class="histCard">
+          <div class="histMeta">
+            <span class="date">${escapeHtml(dateTxt)}</span>
+            <span class="nights">${escapeHtml(nightsTxt)}泊</span>
+          </div>
+          <div class="histPills">${pills}</div>
+          <div class="histActions">
+            <button type="button" data-del="${escapeHtml(row.id)}">削除</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    return `<div class="laneBlock"><div class="laneTitle">${escapeHtml(cat)}</div><div class="laneScroll">${cards}</div></div>`;
+  }).filter(Boolean).join("");
+
+  body.innerHTML = `<tr><td colspan="4">${laneBlocks}</td></tr>`;
 
   Array.from(body.querySelectorAll("button[data-del]")).forEach(btn => {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del");
       if (!id) return;
-      showDeleteConfirm("この行を削除", () => {
+      showDeleteConfirmV5("この行を削除", () => {
         deleteRow(id);
         renderStatus();
         renderHistory();
@@ -771,7 +852,7 @@ function renderMaster() {
       const tasks2 = loadTasks();
       const target = tasks2[i];
       if (!target) return;
-      showDeleteConfirm("選択肢を削除", () => { tasks2.splice(i,1); saveTasks(tasks2); renderTaskChips(); renderMaster(); renderReco(); }, () => {});
+      showDeleteConfirmV5("選択肢を削除", () => { tasks2.splice(i,1); saveTasks(tasks2); renderTaskChips(); renderMaster(); renderReco(); }, () => {}); return;
     });
   });
 
@@ -1052,7 +1133,7 @@ function setView(which) {
 }
 
 function boot() {
-  ensureDynamicStyles();
+  ensureDynamicStylesV5();
   ensureDefaultTasks();
 
   $("date").value = todayISO();
@@ -1064,7 +1145,7 @@ function boot() {
   renderReco();
   renderHistory();
   setView("input");
-  setupInputCollapsibles();
+  setupMasterCollapsiblesV5();
 }
 
 /* events */
