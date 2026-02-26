@@ -1,0 +1,10 @@
+<!-- v=2026-02-26-9 のように毎回値を更新 -->
+<script src="app.js?v=2026-02-26-9"></script>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js?v=2026-02-26-9");
+    });
+  }
+</script>
