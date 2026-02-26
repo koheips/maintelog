@@ -1,5 +1,5 @@
-/* maintelog sw v6 */
-const CACHE_NAME = "maintelog-v6-2026-02-26-1";
+/* maintelog sw v7 */
+const CACHE_NAME = "maintelog-v7-2026-02-26-1";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -36,13 +36,12 @@ self.addEventListener("fetch", (event) => {
 
     try {
       const res = await fetch(req);
-      // Cache same-origin successful responses
       const url = new URL(req.url);
       if (url.origin === location.origin && res.ok) {
         cache.put(req, res.clone());
       }
       return res;
-    } catch (e) {
+    } catch (_) {
       return cached || Response.error();
     }
   })());

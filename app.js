@@ -12,49 +12,7 @@ const STORAGE_KEY = "maintelog_rows_v2";      // 互換維持
 const TASKS_KEY = "maintelog_tasks_v2";       // 互換維持
 const APPNAME_KEY = "maintelog_appname_v3";
 
-const CATS_KEY = "maintelog_cats_v1"; // 新規 既存キーと衝突しない
-
-const DEFAULT_CATS = ["掃除","洗濯","その他"];
-
-function loadCats() {
-  try {
-    const raw = localStorage.getItem(CATS_KEY);
-    if (!raw) return DEFAULT_CATS.slice();
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return DEFAULT_CATS.slice();
-    const out = [];
-    const seen = new Set();
-    arr.forEach(v => {
-      const s = String(v ?? "").trim();
-      if (!s) return;
-      if (seen.has(s)) return;
-      seen.add(s);
-      out.push(s);
-    });
-    return out.length ? out : DEFAULT_CATS.slice();
-  } catch (_) {
-    return DEFAULT_CATS.slice();
-  }
-}
-
-function saveCats(cats) {
-  const out = [];
-  const seen = new Set();
-  (cats || []).forEach(v => {
-    const s = String(v ?? "").trim();
-    if (!s) return;
-    if (seen.has(s)) return;
-    seen.add(s);
-    out.push(s);
-  });
-  localStorage.setItem(CATS_KEY, JSON.stringify(out.length ? out : DEFAULT_CATS.slice()));
-}
-
-function getCats() {
-  return loadCats();
-}
-
-const CATS = DEFAULT_CATS.slice();
+const CATS = ["掃除", "洗濯", "その他"];
 
 const defaultTaskNames = [
   "拭き掃除",
@@ -218,248 +176,95 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-/* v6 UI patches
-  ・履歴を区分レーン表示へ 1レーン単位で横スクロール 省略なし 折り返しなし
-  ・作業内容マスターは折りたたみ
-  ・作業内容マスターの下に区分マスターを追加
-  ・下部固定の 入力 履歴 ボタンは非表示 または削除
+/* v7 history lane UI
+  ・区分ごとの3レーンを縦積み
+  ・各レーンのみ横スクロール
+  ・省略なし 折り返しなし
+  ・他UIは変更しない
 */
 
-function ensureDynamicStylesV6() {
-  if (document.getElementById("dynamicStyles_v6")) return;
+function ensureHistoryLaneStylesV7() {
+  if (document.getElementById("historyLaneStyles_v7")) return;
   const css = `
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      white-space:nowrap;
-      word-break:keep-all;
-      overflow-wrap:normal;
-      padding:5px 10px;
-      border-radius:999px;
-      line-height:1.1;
+    .histLanesV7 { display: grid; gap: 14px; }
+    .histLaneV7 { display:block; }
+    .histLaneScrollV7 {
+      position: relative;
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 12px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 6px 4px;
+      white-space: nowrap;
     }
-
-    .laneBlock{ margin: 12px 0 18px; }
-    .laneScroll{
-      position:relative;
-      display:flex;
-      flex-wrap:nowrap;
-      gap:12px;
-      overflow-x:auto;
-      -webkit-overflow-scrolling:touch;
-      padding:6px 6px;
-      scrollbar-width:thin;
-      scroll-snap-type:x proximity;
-    }
-    .laneScroll::after{
+    .histLaneScrollV7::after{
       content:"";
-      position:sticky;
-      right:0;
-      width:22px;
-      height:100%;
-      margin-left:auto;
-      pointer-events:none;
-      background:linear-gradient(to left, rgba(0,0,0,0.8), rgba(0,0,0,0));
+      position: sticky;
+      right: 0;
+      width: 22px;
+      height: 100%;
+      margin-left: auto;
+      pointer-events: none;
+      background: linear-gradient(to left, rgba(0,0,0,0.75), rgba(0,0,0,0));
     }
-
-    .histCard{
+    .histCardV7{
       flex: 0 0 auto;
-      min-width: 240px;
+      min-width: 260px;
       max-width: 86vw;
       border: 1px solid rgba(255,255,255,0.10);
       background: rgba(255,255,255,0.03);
       border-radius: 18px;
       padding: 12px;
-      scroll-snap-align:start;
     }
-    .histMeta{
+    .histMetaV7{
       display:flex;
-      gap:10px;
-      align-items:baseline;
-      justify-content:space-between;
-      margin-bottom:10px;
-      white-space:nowrap;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+      margin-bottom: 10px;
+      white-space: nowrap;
     }
-    .histMeta .date{ font-size:16px; }
-    .histMeta .nights{ opacity:0.8; font-size:14px; }
-    .histPills{
+    .histPillsV7{
       display:flex;
-      flex-wrap:nowrap;
-      gap:8px;
-      white-space:nowrap;
-      overflow:hidden;
+      flex-wrap: nowrap;
+      gap: 8px;
+      overflow: hidden;
+      white-space: nowrap;
     }
-    .histActions{
+    .histActionsV7{
       display:flex;
       justify-content:flex-end;
-      margin-top:10px;
+      margin-top: 10px;
     }
-
-    .miniPanel{
-      border:1px solid rgba(255,255,255,0.12);
-      border-radius:18px;
-      padding:12px;
-      margin:10px 0;
-      background:rgba(255,255,255,0.03);
-    }
-    .miniToggle{
-      width:100%;
-      text-align:left;
-      margin:10px 0;
-    }
-    .miniRow{
-      display:flex;
-      gap:10px;
+    /* 縦割れ防止 */
+    .histCardV7 .pill{
+      display:inline-flex;
       align-items:center;
-      flex-wrap:wrap;
-    }
-    .miniRow input[type=text]{ flex:1 1 180px; }
-
-    /* hide common fixed bottom nav */
-    #bottomNav, #bottomBar, #bottomButtons, .bottomNav, .bottomBar, .bottomButtons, .bottom-tabs, .bottomTabs, .fixedBottom, .stickyBottom{
-      display:none !important;
+      white-space:nowrap;
+      word-break:keep-all;
+      overflow-wrap:normal;
     }
   `;
   const st = document.createElement("style");
-  st.id = "dynamicStyles_v6";
+  st.id = "historyLaneStyles_v7";
   st.textContent = css;
   document.head.appendChild(st);
 }
 
-function showDeleteConfirmV6(message, onYes, onNo) {
+function showDeleteConfirmV7(message, onYes, onNo) {
   const p = document.createElement("div");
   p.textContent = message;
   p.style.fontSize = "16px";
   p.style.lineHeight = "1.4";
   openModal({
     title: "確認",
-    bodyNodes: [p],
-    okText: "削除OK",
-    cancelText: "キャンセル",
+    bodyNodes:[p],
+    okText:"削除OK",
+    cancelText:"キャンセル",
     onOk: () => { onYes && onYes(); },
     onCancel: () => { onNo && onNo(); }
   });
-}
-
-function collapseMasterV6() {
-  const master = document.getElementById("master");
-  if (master && !document.getElementById("masterWrap_v6")) {
-    const wrap = document.createElement("div");
-    wrap.id = "masterWrap_v6";
-    wrap.style.display = "none";
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.id = "masterToggleBtn_v6";
-    btn.className = "miniToggle";
-    btn.textContent = "作業内容マスター 表示";
-
-    master.parentNode.insertBefore(btn, master);
-    master.parentNode.insertBefore(wrap, master);
-    wrap.appendChild(master);
-
-    btn.addEventListener("click", () => {
-      const open = wrap.style.display !== "none";
-      wrap.style.display = open ? "none" : "";
-      btn.textContent = open ? "作業内容マスター 表示" : "作業内容マスター 非表示";
-    });
-  }
-}
-
-function setupCatMasterV6() {
-  if (document.getElementById("catMasterPanel_v6")) return;
-
-  const panel = document.createElement("div");
-  panel.id = "catMasterPanel_v6";
-  panel.className = "miniPanel";
-
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "miniToggle";
-  toggle.textContent = "区分マスター 表示";
-
-  const body = document.createElement("div");
-  body.style.display = "none";
-
-  const row = document.createElement("div");
-  row.className = "miniRow";
-
-  const inp = document.createElement("input");
-  inp.type = "text";
-  inp.placeholder = "区分名を追加";
-  inp.id = "catName_v6";
-
-  const add = document.createElement("button");
-  add.type = "button";
-  add.textContent = "追加";
-
-  row.appendChild(inp);
-  row.appendChild(add);
-
-  const list = document.createElement("div");
-  list.id = "catList_v6";
-  list.style.marginTop = "10px";
-
-  const render = () => {
-    const cats = getCats();
-    list.innerHTML = cats.map(c => `<span class="pill" style="margin-right:8px">${escapeHtml(c)}</span>`).join("");
-  };
-
-  add.addEventListener("click", () => {
-    const name = String(inp.value ?? "").trim();
-    if (!name) return;
-    const cats = getCats();
-    if (cats.includes(name)) {
-      showAlert("確認", "同名が既に存在");
-      return;
-    }
-    cats.push(name);
-    saveCats(cats);
-    inp.value = "";
-    render();
-    // UI再描画
-    renderTaskChips();
-    renderMaster();
-    renderReco();
-    renderHistory();
-  });
-
-  toggle.addEventListener("click", () => {
-    const open = body.style.display !== "none";
-    body.style.display = open ? "none" : "";
-    toggle.textContent = open ? "区分マスター 表示" : "区分マスター 非表示";
-  });
-
-  body.appendChild(row);
-  body.appendChild(list);
-  panel.appendChild(toggle);
-  panel.appendChild(body);
-
-  // 作業内容マスターの下に挿入
-  const masterWrap = document.getElementById("masterWrap_v6");
-  const master = document.getElementById("master");
-  if (masterWrap && masterWrap.parentNode) {
-    masterWrap.parentNode.insertBefore(panel, masterWrap.nextSibling);
-  } else if (master && master.parentNode) {
-    master.parentNode.insertBefore(panel, master.nextSibling);
-  } else {
-    document.body.appendChild(panel);
-  }
-
-  render();
-}
-
-function removeBottomNavV6() {
-  // 位置固定で 入力 と 履歴 を含むコンテナを削除候補にする
-  const els = Array.from(document.querySelectorAll("body *"));
-  const hit = els.find(el => {
-    const st = window.getComputedStyle(el);
-    if (st.position !== "fixed") return false;
-    if (parseFloat(st.bottom || "9999") > 80) return false;
-    const txt = (el.textContent || "").replace(/\s+/g,"");
-    return txt.includes("入力") && txt.includes("履歴");
-  });
-  if (hit && hit.parentNode) hit.parentNode.removeChild(hit);
 }
 
 
@@ -525,7 +330,7 @@ function migrateTasks(raw) {
   if (Array.isArray(raw) && raw.every(x => x && typeof x === "object" && typeof x.name === "string")) {
     return raw.map(x => ({
       name: String(x.name).trim(),
-      cat: getCats().includes(String(x.cat ?? '').trim()) ? String(x.cat ?? '').trim() : "その他",
+      cat: CATS.includes(x.cat) ? x.cat : "その他",
       freqDays: normalizeIntOrNull(x.freqDays),
       bg: clampColor(x.bg, "#0f0f0f"),
       text: clampColor(x.text, "#f0f0f0")
@@ -575,7 +380,7 @@ function saveTasks(tasks) {
     .filter(x => x && typeof x === "object")
     .map(x => ({
       name: String(x.name ?? "").trim(),
-      cat: getCats().includes(String(x.cat ?? '').trim()) ? String(x.cat ?? '').trim() : "その他",
+      cat: CATS.includes(x.cat) ? x.cat : "その他",
       freqDays: normalizeIntOrNull(x.freqDays),
       bg: clampColor(x.bg, "#0f0f0f"),
       text: clampColor(x.text, "#f0f0f0")
@@ -626,7 +431,7 @@ function renderStatus() {
 function tasksByCat(tasks) {
   const map = { "掃除": [], "洗濯": [], "その他": [] };
   tasks.forEach(t => {
-    const cat = getCats().includes(t.cat) ? t.cat : "その他";
+    const cat = CATS.includes(t.cat) ? t.cat : "その他";
     map[cat].push(t);
   });
   return map;
@@ -638,7 +443,7 @@ function renderTaskChips() {
   const area = $("tasksArea");
   area.innerHTML = "";
 
-  getCats().forEach(cat => {
+  CATS.forEach(cat => {
     const items = byCat[cat] || [];
     const title = document.createElement("div");
     title.className = "groupTitle";
@@ -737,57 +542,54 @@ function renderHistory() {
     return;
   }
 
-  const cats = getCats();
+  ensureHistoryLaneStylesV7();
+
+  const cats = ["掃除","洗濯","その他"]; // 固定順
   const tasks = loadTasks();
 
-  function taskCatByName(name) {
+  function catOfTask(name) {
     const hit = tasks.find(t => t.name === name);
     const c = hit ? String(hit.cat ?? "").trim() : "";
     return cats.includes(c) ? c : "その他";
   }
 
-  // レーンごとのカード配列
-  const laneCards = {};
-  cats.forEach(c => laneCards[c] = []);
+  // レーンにカードを積む 同一履歴は該当区分ごとに複製して表示
+  const laneCards = { "掃除": [], "洗濯": [], "その他": [] };
 
   rows.forEach(r => {
     const taskNames = Array.isArray(r.tasks) ? r.tasks : [];
-    const perCat = {};
-    cats.forEach(c => perCat[c] = []);
+    const per = { "掃除": [], "洗濯": [], "その他": [] };
 
     taskNames.forEach(nm => {
-      const c = taskCatByName(nm);
-      if (!perCat[c]) perCat[c] = [];
-      perCat[c].push(nm);
+      const c = catOfTask(nm);
+      per[c].push(nm);
     });
 
     const other = String(r.other ?? "").trim();
-    if (other) {
-      if (!perCat["その他"]) perCat["その他"] = [];
-      perCat["その他"].push(other);
-    }
+    if (other) per["その他"].push(other);
 
     cats.forEach(c => {
-      const items = perCat[c] || [];
-      if (!items.length) return;
+      if (!per[c].length) return;
 
       const dateTxt = r.date ? formatJP(r.date) : "日付不明";
       const nightsTxt = (r.nights === 0 || r.nights) ? String(r.nights) : "";
 
-      const pills = items.map(name => {
-        const style = taskStyleByName(name);
-        if (style) return `<span class="pill" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(name)}</span>`;
-        return `<span class="pill">${escapeHtml(name)}</span>`;
+      const pills = per[c].map(p => {
+        const style = taskStyleByName(p);
+        if (style) {
+          return `<span class="pill" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(p)}</span>`;
+        }
+        return `<span class="pill">${escapeHtml(p)}</span>`;
       }).join("");
 
       laneCards[c].push(`
-        <div class="histCard">
-          <div class="histMeta">
-            <span class="date">${escapeHtml(dateTxt)}</span>
-            <span class="nights">${escapeHtml(nightsTxt)}泊</span>
+        <div class="histCardV7">
+          <div class="histMetaV7">
+            <span>${escapeHtml(dateTxt)}</span>
+            <span>${escapeHtml(nightsTxt)}泊</span>
           </div>
-          <div class="histPills">${pills}</div>
-          <div class="histActions">
+          <div class="histPillsV7">${pills}</div>
+          <div class="histActionsV7">
             <button type="button" data-del="${escapeHtml(r.id)}">削除</button>
           </div>
         </div>
@@ -795,19 +597,19 @@ function renderHistory() {
     });
   });
 
-  const blocks = cats.map(c => {
-    const cards = laneCards[c] || [];
-    if (!cards.length) return "";
-    return `<div class="laneBlock"><div class="laneScroll">${cards.join("")}</div></div>`;
+  const lanesHtml = cats.map(c => {
+    const cards = laneCards[c];
+    if (!cards.length) return ""; // 空レーンは非表示
+    return `<div class="histLaneV7"><div class="histLaneScrollV7">${cards.join("")}</div></div>`;
   }).filter(Boolean).join("");
 
-  body.innerHTML = `<tr><td colspan="4">${blocks || `<span class="muted">記録なし</span>`}</td></tr>`;
+  body.innerHTML = `<tr><td colspan="4"><div class="histLanesV7">${lanesHtml}</div></td></tr>`;
 
   Array.from(body.querySelectorAll("button[data-del]")).forEach(btn => {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del");
       if (!id) return;
-      showDeleteConfirmV6("この行を削除", () => {
+      showDeleteConfirmV7("この行を削除", () => {
         deleteRow(id);
         renderStatus();
         renderHistory();
@@ -902,12 +704,12 @@ function renderMaster() {
 
       showModal("項目を編集", [
         {id:"name", label:"項目名", type:"text", value:t.name},
-        {id:"cat", label:"区分", type:"select", value:t.cat, options:getCats()},
+        {id:"cat", label:"区分", type:"select", value:t.cat, options:CATS},
         {id:"freq", label:"推奨頻度 日数 空欄で未設定", type:"number", value:(t.freqDays && t.freqDays>0)?String(t.freqDays):"", inputmode:"numeric"}
       ], (out) => {
         const nm = String(out.name ?? "").trim();
         if (nm.length === 0) return;
-        const ct = getCats().includes(String(out.cat).trim()) ? String(out.cat).trim() : "その他";
+        const ct = CATS.includes(String(out.cat).trim()) ? String(out.cat).trim() : "その他";
         const fd = normalizeIntOrNull(String(out.freq ?? "").trim());
         const freqDays = (fd && fd > 0) ? fd : null;
 
@@ -958,7 +760,7 @@ function addTaskFromInputs() {
   if (name.length === 0) return;
 
   const cat = String($("newCat").value ?? "").trim();
-  const ct = getCats().includes(cat) ? cat : "その他";
+  const ct = CATS.includes(cat) ? cat : "その他";
 
   const freqRaw = $("newFreq").value;
   const fd = normalizeIntOrNull(freqRaw);
@@ -1136,12 +938,10 @@ function setView(which) {
   if (!isInput) {
     renderReco();
     renderHistory();
-    try{ removeBottomNavV6(); }catch(_){ }
-}
+  }
 }
 
 function boot() {
-  ensureDynamicStylesV6();
   ensureDefaultTasks();
 
   $("date").value = todayISO();
@@ -1153,9 +953,6 @@ function boot() {
   renderReco();
   renderHistory();
   setView("input");
-  collapseMasterV6();
-  setupCatMasterV6();
-  removeBottomNavV6();
 }
 
 /* events */
