@@ -12,29 +12,26 @@ const STORAGE_KEY = "maintelog_rows_v2";      // 互換維持
 const TASKS_KEY = "maintelog_tasks_v2";       // 互換維持
 const APPNAME_KEY = "maintelog_appname_v3";
 
-const CATS_KEY = "maintelog_cats_v1";          // 新規 既存と衝突しない
+const CATS_KEY = "maintelog_cats_v1"; // 新規 既存キーと衝突しない
 
-const DEFAULT_CATS = ["掃除", "洗濯", "その他"];
+const DEFAULT_CATS = ["掃除","洗濯","その他"];
 
 function loadCats() {
   try {
     const raw = localStorage.getItem(CATS_KEY);
     if (!raw) return DEFAULT_CATS.slice();
     const arr = JSON.parse(raw);
-    if (Array.isArray(arr) && arr.length > 0) {
-      // 文字列のみ、重複除去、空除去
-      const out = [];
-      const seen = new Set();
-      arr.forEach(v => {
-        const s = String(v ?? "").trim();
-        if (!s) return;
-        if (seen.has(s)) return;
-        seen.add(s);
-        out.push(s);
-      });
-      return out.length > 0 ? out : DEFAULT_CATS.slice();
-    }
-    return DEFAULT_CATS.slice();
+    if (!Array.isArray(arr)) return DEFAULT_CATS.slice();
+    const out = [];
+    const seen = new Set();
+    arr.forEach(v => {
+      const s = String(v ?? "").trim();
+      if (!s) return;
+      if (seen.has(s)) return;
+      seen.add(s);
+      out.push(s);
+    });
+    return out.length ? out : DEFAULT_CATS.slice();
   } catch (_) {
     return DEFAULT_CATS.slice();
   }
@@ -221,15 +218,15 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-/* v5 UI patches
-  ・履歴を 区分ごとの3レーンへ分割し レーン単位で横スクロール
-  ・作業内容の縦積み禁止 折り返し禁止
-  ・作業内容マスターと区分マスターを折りたたみ
-  ・画面下部の固定 入力/履歴 ボタンを非表示
+/* v6 UI patches
+  ・履歴を区分レーン表示へ 1レーン単位で横スクロール 省略なし 折り返しなし
+  ・作業内容マスターは折りたたみ
+  ・作業内容マスターの下に区分マスターを追加
+  ・下部固定の 入力 履歴 ボタンは非表示 または削除
 */
 
-function ensureDynamicStylesV5() {
-  if (document.getElementById("dynamicStyles_v5")) return;
+function ensureDynamicStylesV6() {
+  if (document.getElementById("dynamicStyles_v6")) return;
   const css = `
     .pill{
       display:inline-flex;
@@ -242,9 +239,7 @@ function ensureDynamicStylesV5() {
       line-height:1.1;
     }
 
-    /* lane layout */
-    .laneBlock{ margin: 10px 0 18px; }
-    .laneTitle{ display:none; }
+    .laneBlock{ margin: 12px 0 18px; }
     .laneScroll{
       position:relative;
       display:flex;
@@ -254,6 +249,7 @@ function ensureDynamicStylesV5() {
       -webkit-overflow-scrolling:touch;
       padding:6px 6px;
       scrollbar-width:thin;
+      scroll-snap-type:x proximity;
     }
     .laneScroll::after{
       content:"";
@@ -268,12 +264,13 @@ function ensureDynamicStylesV5() {
 
     .histCard{
       flex: 0 0 auto;
-      min-width: 220px;
+      min-width: 240px;
       max-width: 86vw;
       border: 1px solid rgba(255,255,255,0.10);
       background: rgba(255,255,255,0.03);
       border-radius: 18px;
       padding: 12px;
+      scroll-snap-align:start;
     }
     .histMeta{
       display:flex;
@@ -289,8 +286,8 @@ function ensureDynamicStylesV5() {
       display:flex;
       flex-wrap:nowrap;
       gap:8px;
-      overflow:visible; /* card自体が横スクロールレーンで見える */
       white-space:nowrap;
+      overflow:hidden;
     }
     .histActions{
       display:flex;
@@ -298,7 +295,6 @@ function ensureDynamicStylesV5() {
       margin-top:10px;
     }
 
-    /* collapsibles */
     .miniPanel{
       border:1px solid rgba(255,255,255,0.12);
       border-radius:18px;
@@ -319,18 +315,18 @@ function ensureDynamicStylesV5() {
     }
     .miniRow input[type=text]{ flex:1 1 180px; }
 
-    /* hide fixed bottom nav buttons if exist */
+    /* hide common fixed bottom nav */
     #bottomNav, #bottomBar, #bottomButtons, .bottomNav, .bottomBar, .bottomButtons, .bottom-tabs, .bottomTabs, .fixedBottom, .stickyBottom{
       display:none !important;
     }
   `;
   const st = document.createElement("style");
-  st.id = "dynamicStyles_v5";
+  st.id = "dynamicStyles_v6";
   st.textContent = css;
   document.head.appendChild(st);
 }
 
-function showDeleteConfirmV5(message, onYes, onNo) {
+function showDeleteConfirmV6(message, onYes, onNo) {
   const p = document.createElement("div");
   p.textContent = message;
   p.style.fontSize = "16px";
@@ -345,17 +341,16 @@ function showDeleteConfirmV5(message, onYes, onNo) {
   });
 }
 
-function setupMasterCollapsiblesV5() {
-  // 作業内容マスター折りたたみ
+function collapseMasterV6() {
   const master = document.getElementById("master");
-  if (master && !document.getElementById("masterWrap_v5")) {
+  if (master && !document.getElementById("masterWrap_v6")) {
     const wrap = document.createElement("div");
-    wrap.id = "masterWrap_v5";
+    wrap.id = "masterWrap_v6";
     wrap.style.display = "none";
 
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.id = "masterToggleBtn_v5";
+    btn.id = "masterToggleBtn_v6";
     btn.className = "miniToggle";
     btn.textContent = "作業内容マスター 表示";
 
@@ -369,89 +364,102 @@ function setupMasterCollapsiblesV5() {
       btn.textContent = open ? "作業内容マスター 表示" : "作業内容マスター 非表示";
     });
   }
+}
 
-  // 区分マスター
-  const inputView = document.getElementById("viewInput") || document.body;
-  if (!document.getElementById("catMasterPanel_v5")) {
-    const panel = document.createElement("div");
-    panel.id = "catMasterPanel_v5";
-    panel.className = "miniPanel";
+function setupCatMasterV6() {
+  if (document.getElementById("catMasterPanel_v6")) return;
 
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "miniToggle";
-    toggle.textContent = "区分マスター 表示";
+  const panel = document.createElement("div");
+  panel.id = "catMasterPanel_v6";
+  panel.className = "miniPanel";
 
-    const body = document.createElement("div");
-    body.style.display = "none";
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "miniToggle";
+  toggle.textContent = "区分マスター 表示";
 
-    const row = document.createElement("div");
-    row.className = "miniRow";
+  const body = document.createElement("div");
+  body.style.display = "none";
 
-    const inp = document.createElement("input");
-    inp.type = "text";
-    inp.placeholder = "区分名を追加";
-    inp.id = "catName_v5";
+  const row = document.createElement("div");
+  row.className = "miniRow";
 
-    const add = document.createElement("button");
-    add.type = "button";
-    add.textContent = "追加";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.placeholder = "区分名を追加";
+  inp.id = "catName_v6";
 
-    row.appendChild(inp);
-    row.appendChild(add);
+  const add = document.createElement("button");
+  add.type = "button";
+  add.textContent = "追加";
 
-    const list = document.createElement("div");
-    list.id = "catList_v5";
-    list.style.marginTop = "10px";
+  row.appendChild(inp);
+  row.appendChild(add);
 
-    const render = () => {
-      const cats = getCats();
-      list.innerHTML = cats.map(c => `<span class="pill" style="margin-right:8px">${escapeHtml(c)}</span>`).join("");
-    };
+  const list = document.createElement("div");
+  list.id = "catList_v6";
+  list.style.marginTop = "10px";
 
-    add.addEventListener("click", () => {
-      const name = String(inp.value ?? "").trim();
-      if (!name) return;
-      const cats = getCats();
-      if (cats.includes(name)) {
-        showAlert("確認", "同名が既に存在");
-        return;
-      }
-      cats.push(name);
-      saveCats(cats);
-      inp.value = "";
-      render();
-      // 区分選択UIの再描画
-      renderTaskChips();
-      renderMaster();
-      renderReco();
-      renderHistory();
-    });
+  const render = () => {
+    const cats = getCats();
+    list.innerHTML = cats.map(c => `<span class="pill" style="margin-right:8px">${escapeHtml(c)}</span>`).join("");
+  };
 
-    toggle.addEventListener("click", () => {
-      const open = body.style.display !== "none";
-      body.style.display = open ? "none" : "";
-      toggle.textContent = open ? "区分マスター 表示" : "区分マスター 非表示";
-    });
-
-    body.appendChild(row);
-    body.appendChild(list);
-    panel.appendChild(toggle);
-    panel.appendChild(body);
-
-    // 作業内容マスターの下に入れる
-    const masterWrap = document.getElementById("masterWrap_v5");
-    const masterToggleBtn = document.getElementById("masterToggleBtn_v5");
-    if (masterWrap && masterWrap.parentNode) {
-      masterWrap.parentNode.insertBefore(panel, masterWrap.nextSibling);
-    } else if (master && master.parentNode) {
-      master.parentNode.insertBefore(panel, master.nextSibling);
-    } else {
-      inputView.appendChild(panel);
+  add.addEventListener("click", () => {
+    const name = String(inp.value ?? "").trim();
+    if (!name) return;
+    const cats = getCats();
+    if (cats.includes(name)) {
+      showAlert("確認", "同名が既に存在");
+      return;
     }
-
+    cats.push(name);
+    saveCats(cats);
+    inp.value = "";
     render();
+    // UI再描画
+    renderTaskChips();
+    renderMaster();
+    renderReco();
+    renderHistory();
+  });
+
+  toggle.addEventListener("click", () => {
+    const open = body.style.display !== "none";
+    body.style.display = open ? "none" : "";
+    toggle.textContent = open ? "区分マスター 表示" : "区分マスター 非表示";
+  });
+
+  body.appendChild(row);
+  body.appendChild(list);
+  panel.appendChild(toggle);
+  panel.appendChild(body);
+
+  // 作業内容マスターの下に挿入
+  const masterWrap = document.getElementById("masterWrap_v6");
+  const master = document.getElementById("master");
+  if (masterWrap && masterWrap.parentNode) {
+    masterWrap.parentNode.insertBefore(panel, masterWrap.nextSibling);
+  } else if (master && master.parentNode) {
+    master.parentNode.insertBefore(panel, master.nextSibling);
+  } else {
+    document.body.appendChild(panel);
   }
+
+  render();
+}
+
+function removeBottomNavV6() {
+  // 位置固定で 入力 と 履歴 を含むコンテナを削除候補にする
+  const els = Array.from(document.querySelectorAll("body *"));
+  const hit = els.find(el => {
+    const st = window.getComputedStyle(el);
+    if (st.position !== "fixed") return false;
+    if (parseFloat(st.bottom || "9999") > 80) return false;
+    const txt = (el.textContent || "").replace(/\s+/g,"");
+    return txt.includes("入力") && txt.includes("履歴");
+  });
+  if (hit && hit.parentNode) hit.parentNode.removeChild(hit);
 }
 
 
@@ -517,7 +525,7 @@ function migrateTasks(raw) {
   if (Array.isArray(raw) && raw.every(x => x && typeof x === "object" && typeof x.name === "string")) {
     return raw.map(x => ({
       name: String(x.name).trim(),
-      cat: CATS.includes(x.cat) ? x.cat : "その他",
+      cat: getCats().includes(String(x.cat ?? '').trim()) ? String(x.cat ?? '').trim() : "その他",
       freqDays: normalizeIntOrNull(x.freqDays),
       bg: clampColor(x.bg, "#0f0f0f"),
       text: clampColor(x.text, "#f0f0f0")
@@ -567,7 +575,7 @@ function saveTasks(tasks) {
     .filter(x => x && typeof x === "object")
     .map(x => ({
       name: String(x.name ?? "").trim(),
-      cat: CATS.includes(x.cat) ? x.cat : "その他",
+      cat: getCats().includes(String(x.cat ?? '').trim()) ? String(x.cat ?? '').trim() : "その他",
       freqDays: normalizeIntOrNull(x.freqDays),
       bg: clampColor(x.bg, "#0f0f0f"),
       text: clampColor(x.text, "#f0f0f0")
@@ -618,7 +626,7 @@ function renderStatus() {
 function tasksByCat(tasks) {
   const map = { "掃除": [], "洗濯": [], "その他": [] };
   tasks.forEach(t => {
-    const cat = CATS.includes(t.cat) ? t.cat : "その他";
+    const cat = getCats().includes(t.cat) ? t.cat : "その他";
     map[cat].push(t);
   });
   return map;
@@ -729,55 +737,50 @@ function renderHistory() {
     return;
   }
 
-  // 区分ごとの3レーン（初期3区分 + 追加区分）
   const cats = getCats();
-  const lanes = {};
-  cats.forEach(c => lanes[c] = []);
-
   const tasks = loadTasks();
 
   function taskCatByName(name) {
     const hit = tasks.find(t => t.name === name);
-    return hit && cats.includes(hit.cat) ? hit.cat : "その他";
+    const c = hit ? String(hit.cat ?? "").trim() : "";
+    return cats.includes(c) ? c : "その他";
   }
 
-  // 各履歴を区分別に振り分け（同一履歴が複数レーンに出る）
+  // レーンごとのカード配列
+  const laneCards = {};
+  cats.forEach(c => laneCards[c] = []);
+
   rows.forEach(r => {
     const taskNames = Array.isArray(r.tasks) ? r.tasks : [];
-    const byCat = {};
-    cats.forEach(c => byCat[c] = []);
+    const perCat = {};
+    cats.forEach(c => perCat[c] = []);
+
     taskNames.forEach(nm => {
       const c = taskCatByName(nm);
-      if (!byCat[c]) byCat[c] = [];
-      byCat[c].push(nm);
+      if (!perCat[c]) perCat[c] = [];
+      perCat[c].push(nm);
     });
 
-    // other は その他へ
     const other = String(r.other ?? "").trim();
     if (other) {
-      if (!byCat["その他"]) byCat["その他"] = [];
-      byCat["その他"].push(other);
+      if (!perCat["その他"]) perCat["その他"] = [];
+      perCat["その他"].push(other);
     }
 
     cats.forEach(c => {
-      if (byCat[c] && byCat[c].length) {
-        lanes[c].push({ row: r, items: byCat[c] });
-      }
-    });
-  });
+      const items = perCat[c] || [];
+      if (!items.length) return;
 
-  const laneBlocks = cats.map(cat => {
-    const items = lanes[cat] || [];
-    if (!items.length) return ""; // 該当ゼロのレーンは非表示
-    const cards = items.map(({row, items}) => {
-      const dateTxt = row.date ? formatJP(row.date) : "日付不明";
-      const nightsTxt = (row.nights === 0 || row.nights) ? String(row.nights) : "";
+      const dateTxt = r.date ? formatJP(r.date) : "日付不明";
+      const nightsTxt = (r.nights === 0 || r.nights) ? String(r.nights) : "";
+
       const pills = items.map(name => {
         const style = taskStyleByName(name);
         if (style) return `<span class="pill" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(name)}</span>`;
         return `<span class="pill">${escapeHtml(name)}</span>`;
       }).join("");
-      return `
+
+      laneCards[c].push(`
         <div class="histCard">
           <div class="histMeta">
             <span class="date">${escapeHtml(dateTxt)}</span>
@@ -785,22 +788,26 @@ function renderHistory() {
           </div>
           <div class="histPills">${pills}</div>
           <div class="histActions">
-            <button type="button" data-del="${escapeHtml(row.id)}">削除</button>
+            <button type="button" data-del="${escapeHtml(r.id)}">削除</button>
           </div>
         </div>
-      `;
-    }).join("");
+      `);
+    });
+  });
 
-    return `<div class="laneBlock"><div class="laneTitle">${escapeHtml(cat)}</div><div class="laneScroll">${cards}</div></div>`;
+  const blocks = cats.map(c => {
+    const cards = laneCards[c] || [];
+    if (!cards.length) return "";
+    return `<div class="laneBlock"><div class="laneScroll">${cards.join("")}</div></div>`;
   }).filter(Boolean).join("");
 
-  body.innerHTML = `<tr><td colspan="4">${laneBlocks}</td></tr>`;
+  body.innerHTML = `<tr><td colspan="4">${blocks || `<span class="muted">記録なし</span>`}</td></tr>`;
 
   Array.from(body.querySelectorAll("button[data-del]")).forEach(btn => {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del");
       if (!id) return;
-      showDeleteConfirmV5("この行を削除", () => {
+      showDeleteConfirmV6("この行を削除", () => {
         deleteRow(id);
         renderStatus();
         renderHistory();
@@ -852,7 +859,7 @@ function renderMaster() {
       const tasks2 = loadTasks();
       const target = tasks2[i];
       if (!target) return;
-      showDeleteConfirmV5("選択肢を削除", () => { tasks2.splice(i,1); saveTasks(tasks2); renderTaskChips(); renderMaster(); renderReco(); }, () => {}); return;
+      showConfirm("確認","選択肢を削除", () => { tasks2.splice(i,1); saveTasks(tasks2); renderTaskChips(); renderMaster(); renderReco(); }, () => {}); return;
     });
   });
 
@@ -895,12 +902,12 @@ function renderMaster() {
 
       showModal("項目を編集", [
         {id:"name", label:"項目名", type:"text", value:t.name},
-        {id:"cat", label:"区分", type:"select", value:t.cat, options:CATS},
+        {id:"cat", label:"区分", type:"select", value:t.cat, options:getCats()},
         {id:"freq", label:"推奨頻度 日数 空欄で未設定", type:"number", value:(t.freqDays && t.freqDays>0)?String(t.freqDays):"", inputmode:"numeric"}
       ], (out) => {
         const nm = String(out.name ?? "").trim();
         if (nm.length === 0) return;
-        const ct = CATS.includes(String(out.cat).trim()) ? String(out.cat).trim() : "その他";
+        const ct = getCats().includes(String(out.cat).trim()) ? String(out.cat).trim() : "その他";
         const fd = normalizeIntOrNull(String(out.freq ?? "").trim());
         const freqDays = (fd && fd > 0) ? fd : null;
 
@@ -951,7 +958,7 @@ function addTaskFromInputs() {
   if (name.length === 0) return;
 
   const cat = String($("newCat").value ?? "").trim();
-  const ct = CATS.includes(cat) ? cat : "その他";
+  const ct = getCats().includes(cat) ? cat : "その他";
 
   const freqRaw = $("newFreq").value;
   const fd = normalizeIntOrNull(freqRaw);
@@ -1129,11 +1136,12 @@ function setView(which) {
   if (!isInput) {
     renderReco();
     renderHistory();
-  }
+    try{ removeBottomNavV6(); }catch(_){ }
+}
 }
 
 function boot() {
-  ensureDynamicStylesV5();
+  ensureDynamicStylesV6();
   ensureDefaultTasks();
 
   $("date").value = todayISO();
@@ -1145,7 +1153,9 @@ function boot() {
   renderReco();
   renderHistory();
   setView("input");
-  setupMasterCollapsiblesV5();
+  collapseMasterV6();
+  setupCatMasterV6();
+  removeBottomNavV6();
 }
 
 /* events */

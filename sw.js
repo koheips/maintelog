@@ -1,58 +1,49 @@
-const CACHE_NAME = 'maintelog-cache-v2026-02-24-1';
-// メンテログ service worker
-// キャッシュ更新対策として version 付きキャッシュ名を使用
-const CACHE_PREFIX = "maintelog_cache_";
-const CACHE_NAME = CACHE_PREFIX + "v3_20260217055726";
-
-const ASSETS = [
+/* maintelog sw v6 */
+const CACHE_NAME = "maintelog-v6-2026-02-26-1";
+const CORE_ASSETS = [
   "./",
   "./index.html",
   "./app.js",
   "./manifest.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icon-192.png",
+  "./icon-512.png",
+  "./apple-touch-icon.png"
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+  self.skipWaiting();
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(CORE_ASSETS.map(u => new Request(u, {cache: "reload"})));
+  })());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((k) => {
-          if (k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME) return caches.delete(k);
-          return Promise.resolve(false);
-        })
-      )
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => (k === CACHE_NAME ? null : caches.delete(k))));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  const url = new URL(req.url);
+  if (req.method !== "GET") return;
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(req, {ignoreSearch: true});
+    if (cached) return cached;
 
-  // 同一オリジンのみ対象
-  if (url.origin !== self.location.origin) return;
-
-  // HTML はネット優先 失敗時キャッシュ
-  if (req.mode === "navigate" || (req.headers.get("accept") || "").includes("text/html")) {
-    event.respondWith(
-      fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy)).catch(() => {});
-        return res;
-      }).catch(() => caches.match("./index.html"))
-    );
-    return;
-  }
-
-  // それ以外はキャッシュ優先
-  event.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req))
-  );
+    try {
+      const res = await fetch(req);
+      // Cache same-origin successful responses
+      const url = new URL(req.url);
+      if (url.origin === location.origin && res.ok) {
+        cache.put(req, res.clone());
+      }
+      return res;
+    } catch (e) {
+      return cached || Response.error();
+    }
+  })());
 });
