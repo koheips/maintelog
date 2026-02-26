@@ -174,250 +174,6 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-
-
-/* v4 UI patches
-  ・履歴を 掃除 洗濯 その他 の3レーン表示へ
-  ・各レーン内のみ横スクロールで全件表示
-  ・作業内容マスターと辞書編集UIを折りたたみ
-  ・削除確認ボタン文言を明示
-*/
-
-function ensureDynamicStyles() {
-  if (document.getElementById("dynamicStyles_v4")) return;
-  const css = `
-    /* pills smaller + no vertical breaking */
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      white-space:nowrap;
-      word-break:keep-all;
-      overflow-wrap:normal;
-      padding:5px 10px;
-      border-radius:999px;
-      line-height:1.1;
-    }
-
-    /* lanes inside history cell */
-    .lanes{
-      display:grid;
-      gap:8px;
-      min-width:0;
-    }
-    .laneScroll{
-      position:relative;
-      display:flex;
-      flex-wrap:nowrap;
-      gap:8px;
-      overflow-x:auto;
-      -webkit-overflow-scrolling:touch;
-      padding:2px 0;
-      scrollbar-width:thin;
-    }
-    .laneScroll::after{
-      content:"";
-      position:sticky;
-      right:0;
-      width:18px;
-      height:100%;
-      margin-left:auto;
-      pointer-events:none;
-      background:linear-gradient(to left, rgba(0,0,0,0.75), rgba(0,0,0,0));
-    }
-
-    /* collapsibles */
-    .miniPanel{
-      border:1px solid rgba(255,255,255,0.12);
-      border-radius:18px;
-      padding:12px;
-      margin:10px 0;
-      background:rgba(255,255,255,0.03);
-    }
-    .miniRow{
-      display:flex;
-      gap:10px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-    .miniRow input[type=text]{
-      flex:1 1 160px;
-    }
-    .miniToggle{
-      width:100%;
-      text-align:left;
-    }
-  `;
-  const st = document.createElement("style");
-  st.id = "dynamicStyles_v4";
-  st.textContent = css;
-  document.head.appendChild(st);
-}
-
-function showDeleteConfirm(message, onYes, onNo) {
-  const p = document.createElement("div");
-  p.textContent = message;
-  p.style.fontSize = "16px";
-  p.style.lineHeight = "1.4";
-  openModal({
-    title: "確認",
-    bodyNodes: [p],
-    okText: "削除OK",
-    cancelText: "キャンセル",
-    onOk: () => { onYes && onYes(); },
-    onCancel: () => { onNo && onNo(); }
-  });
-}
-
-function getTaskCatByName(name) {
-  const tasks = loadTasks();
-  const hit = tasks.find(t => t.name === name);
-  return hit && CATS.includes(hit.cat) ? hit.cat : null;
-}
-
-function splitToLanes(row) {
-  const out = { "掃除": [], "洗濯": [], "その他": [] };
-
-  const tasks = Array.isArray(row.tasks) ? row.tasks : [];
-  tasks.forEach(nm => {
-    const cat = getTaskCatByName(nm) || "その他";
-    out[cat].push(nm);
-  });
-
-  const other = String(row.other ?? "").trim();
-  if (other.length > 0) out["その他"].push(other);
-
-  return out;
-}
-
-function renderPill(name) {
-  const style = taskStyleByName(name);
-  if (style) {
-    return `<span class="pill" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(name)}</span>`;
-  }
-  return `<span class="pill">${escapeHtml(name)}</span>`;
-}
-
-function renderLaneScroll(items) {
-  if (!items || items.length === 0) return "";
-  const pills = items.map(renderPill).join("");
-  return `<div class="laneScroll">${pills}</div>`;
-}
-
-function setupInputCollapsibles() {
-  // 辞書編集UI（最小）
-  const inputView = document.getElementById("viewInput") || document.body;
-
-  // 既に作成済みなら何もしない
-  if (!document.getElementById("dictPanel_v4")) {
-    const panel = document.createElement("div");
-    panel.id = "dictPanel_v4";
-    panel.className = "miniPanel";
-
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "miniToggle";
-    toggle.textContent = "辞書編集 表示";
-    toggle.style.marginBottom = "10px";
-
-    const body = document.createElement("div");
-    body.style.display = "none";
-
-    const row = document.createElement("div");
-    row.className = "miniRow";
-
-    const sel = document.createElement("select");
-    sel.id = "dictCat_v4";
-    CATS.forEach(c => {
-      const o = document.createElement("option");
-      o.value = c;
-      o.textContent = c;
-      sel.appendChild(o);
-    });
-
-    const inp = document.createElement("input");
-    inp.id = "dictTag_v4";
-    inp.type = "text";
-    inp.placeholder = "追加する作業名";
-
-    const add = document.createElement("button");
-    add.type = "button";
-    add.textContent = "追加";
-
-    row.appendChild(sel);
-    row.appendChild(inp);
-    row.appendChild(add);
-
-    const note = document.createElement("div");
-    note.className = "muted";
-    note.style.marginTop = "8px";
-    note.textContent = "既存と同名は追加しない、追加内容は端末内に保存";
-
-    body.appendChild(row);
-    body.appendChild(note);
-
-    toggle.addEventListener("click", () => {
-      const open = body.style.display !== "none";
-      body.style.display = open ? "none" : "";
-      toggle.textContent = open ? "辞書編集 表示" : "辞書編集 非表示";
-    });
-
-    add.addEventListener("click", () => {
-      const name = String(inp.value ?? "").trim();
-      const cat = String(sel.value ?? "").trim();
-      if (name.length === 0) return;
-
-      const tasks = loadTasks();
-      if (tasks.find(t => t.name === name)) {
-        showAlert("確認", "同名が既に存在");
-        return;
-      }
-      const ct = CATS.includes(cat) ? cat : "その他";
-      tasks.push({ name, cat: ct, freqDays: null, bg: "#0f0f0f", text: "#f0f0f0" });
-      saveTasks(tasks);
-      inp.value = "";
-      renderTaskChips();
-      renderMaster();
-      renderReco();
-      renderHistory();
-    });
-
-    panel.appendChild(toggle);
-    panel.appendChild(body);
-
-    // settings の前、要素が見つからなければ master の直前
-    const master = document.getElementById("master");
-    if (master && master.parentNode) {
-      master.parentNode.insertBefore(panel, master);
-    } else {
-      inputView.insertBefore(panel, inputView.firstChild);
-    }
-  }
-
-  // 作業内容マスター折りたたみ
-  const master = document.getElementById("master");
-  if (master && !document.getElementById("masterWrap_v4")) {
-    const wrap = document.createElement("div");
-    wrap.id = "masterWrap_v4";
-    wrap.style.display = "none";
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.id = "masterToggleBtn_v4";
-    btn.className = "miniToggle";
-    btn.textContent = "作業内容マスター 表示";
-    btn.style.margin = "10px 0";
-
-    master.parentNode.insertBefore(btn, master);
-    master.parentNode.insertBefore(wrap, master);
-    wrap.appendChild(master);
-
-    btn.addEventListener("click", () => {
-      const open = wrap.style.display !== "none";
-      wrap.style.display = open ? "none" : "";
-      btn.textContent = open ? "作業内容マスター 表示" : "作業内容マスター 非表示";
-    });
-  }
-}
 }
 
 function clampColor(hex, fallback) {
@@ -697,19 +453,21 @@ function renderHistory() {
   rows.forEach(r => {
     const dateTxt = r.date ? formatJP(r.date) : "日付不明";
     const nightsTxt = (r.nights === 0 || r.nights) ? String(r.nights) : "";
+    const parts = rowSummaryParts(r);
 
-    const lanes = splitToLanes(r);
-    const laneHtml = [
-      renderLaneScroll(lanes["掃除"]),
-      renderLaneScroll(lanes["洗濯"]),
-      renderLaneScroll(lanes["その他"])
-    ].filter(Boolean).join("");
+    const pills = parts.map(p => {
+      const style = taskStyleByName(p);
+      if (style) {
+        return `<span class="pill" style="background:${escapeHtml(style.bg)};color:${escapeHtml(style.text)}">${escapeHtml(p)}</span>`;
+      }
+      return `<span class="pill">${escapeHtml(p)}</span>`;
+    }).join("");
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(dateTxt)}</td>
       <td>${escapeHtml(nightsTxt)}</td>
-      <td>${laneHtml ? `<div class="lanes">${laneHtml}</div>` : `<span class="muted">空</span>`}</td>
+      <td>${pills || `<span class="muted">空</span>`}</td>
       <td class="right"><button data-del="${escapeHtml(r.id)}" type="button">削除</button></td>
     `;
     body.appendChild(tr);
@@ -719,12 +477,10 @@ function renderHistory() {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del");
       if (!id) return;
-      showDeleteConfirm("この行を削除", () => {
-        deleteRow(id);
-        renderStatus();
-        renderHistory();
-        renderReco();
-      }, () => {});
+      showConfirm("確認","この行を削除", () => { deleteRow(id); renderStatus(); renderHistory(); renderReco(); }, () => {}); return;
+      renderStatus();
+      renderHistory();
+      renderReco();
     });
   });
 }
@@ -771,7 +527,7 @@ function renderMaster() {
       const tasks2 = loadTasks();
       const target = tasks2[i];
       if (!target) return;
-      showDeleteConfirm("選択肢を削除", () => { tasks2.splice(i,1); saveTasks(tasks2); renderTaskChips(); renderMaster(); renderReco(); }, () => {});
+      showConfirm("確認","選択肢を削除", () => { tasks2.splice(i,1); saveTasks(tasks2); renderTaskChips(); renderMaster(); renderReco(); }, () => {}); return;
     });
   });
 
@@ -1052,7 +808,6 @@ function setView(which) {
 }
 
 function boot() {
-  ensureDynamicStyles();
   ensureDefaultTasks();
 
   $("date").value = todayISO();
@@ -1064,7 +819,6 @@ function boot() {
   renderReco();
   renderHistory();
   setView("input");
-  setupInputCollapsibles();
 }
 
 /* events */
