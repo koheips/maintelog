@@ -11,7 +11,7 @@
 const STORAGE_KEY = "maintelog_rows_v2";      // 互換維持
 const TASKS_KEY = "maintelog_tasks_v2";       // 互換維持
 const APPNAME_KEY = "maintelog_appname_v3";
-const APP_BUILD = "2026-02-26-v10";
+const APP_BUILD = "2026-02-26-v11";
 
 const CATS_KEY = "maintelog_cats_v1";          // 新規 既存と衝突しない
 
@@ -813,7 +813,7 @@ function renderHistory() {
     `;
   }).filter(Boolean).join("");
 
-  body.innerHTML = `<tr><td colspan="4">${laneBlocks}</td></tr>`;
+  body.innerHTML = `<tr><td colspan="4"><div class="historyLanes">${laneBlocks}</div></td></tr>`;
 
   Array.from(body.querySelectorAll("button[data-del]")).forEach(btn => {
     btn.addEventListener("click", () => {

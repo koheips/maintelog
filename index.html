@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="manifest" href="manifest.json?v=2026-02-26-v10">
+  <link rel="manifest" href="manifest.json?v=2026-02-26-v11">
   <title>メンテログ</title>
   <style>
     :root {
@@ -96,6 +96,93 @@
       .grid2 { grid-template-columns:1fr; }
       .masterItem { grid-template-columns:1fr; }
     }
+  
+    /* 履歴レーン表示 v11 */
+    .historyLanes{
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+    .laneBlock{
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.02);
+      border-radius:14px;
+      padding:12px;
+    }
+    .laneTitle{
+      font-size:13px;
+      color:var(--muted);
+      margin:0 0 10px;
+      letter-spacing:.06em;
+    }
+    .laneScroll{
+      display:flex;
+      flex-wrap:nowrap;
+      gap:10px;
+      overflow-x:auto;
+      overflow-y:hidden;
+      -webkit-overflow-scrolling:touch;
+      padding-bottom:6px;
+      scroll-snap-type:x mandatory;
+    }
+    .laneScroll::-webkit-scrollbar{ height:8px; }
+    .laneScroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:999px; }
+    .histCard{
+      flex:0 0 auto;
+      width:min(320px, 84vw);
+      scroll-snap-align:start;
+      border:1px solid rgba(255,255,255,.08);
+      background:var(--panel2);
+      border-radius:16px;
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .histMeta{
+      display:flex;
+      gap:10px;
+      align-items:baseline;
+      white-space:nowrap;
+    }
+    .histMeta .date{ font-weight:700; }
+    .histMeta .nights{ color:var(--muted); font-size:13px; }
+    .histPills{
+      display:flex;
+      gap:8px;
+      flex-wrap:nowrap;
+      overflow-x:auto;
+      overflow-y:hidden;
+      -webkit-overflow-scrolling:touch;
+      padding-bottom:2px;
+      white-space:nowrap;
+    }
+    .histPills::-webkit-scrollbar{ height:6px; }
+    .histPills::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:999px; }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.06);
+      font-size:12px;
+      line-height:1;
+      white-space:nowrap;
+      word-break:keep-all;
+      overflow-wrap:normal;
+      flex:0 0 auto;
+    }
+    .histActions{
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      white-space:nowrap;
+    }
+
+    /* 履歴レーン表示時 テーブルセル余白調整 */
+    #historyBody td{ padding:0; }
+
   </style>
 </head>
 <body>
