@@ -11,7 +11,7 @@
 const STORAGE_KEY = "maintelog_rows_v2";      // 互換維持
 const TASKS_KEY = "maintelog_tasks_v2";       // 互換維持
 const APPNAME_KEY = "maintelog_appname_v3";
-const APP_BUILD = "2026-02-26-v11";
+const APP_BUILD = "2026-02-27-v11";
 
 const CATS_KEY = "maintelog_cats_v1";          // 新規 既存と衝突しない
 
@@ -315,6 +315,13 @@ function ensureDynamicStylesV5() {
       margin:10px 0;
       background:rgba(255,255,255,0.03);
     }
+    .catPanel{
+      border:none;
+      background:transparent;
+      padding:0;
+    }
+    .catPanel .miniToggle{ margin:0; }
+    .catPanel #catList_v5{ margin-top:8px; }
     .miniToggle{
       width:100%;
       text-align:left;
@@ -384,7 +391,7 @@ function setupMasterCollapsiblesV5() {
   if (!document.getElementById("catMasterPanel_v5")) {
     const panel = document.createElement("div");
     panel.id = "catMasterPanel_v5";
-    panel.className = "miniPanel";
+    panel.className = "miniPanel catPanel";
 
     const toggle = document.createElement("button");
     toggle.type = "button";
@@ -413,9 +420,64 @@ function setupMasterCollapsiblesV5() {
     list.id = "catList_v5";
     list.style.marginTop = "10px";
 
+    const rerenderAll = () => {
+      renderTaskChips();
+      renderMaster();
+      renderReco();
+      renderHistory();
+    };
+
     const render = () => {
       const cats = getCats();
-      list.innerHTML = cats.map(c => `<span class="pill" style="margin-right:8px">${escapeHtml(c)}</span>`).join("");
+      list.innerHTML = "";
+      cats.forEach((c, idx) => {
+        const r = document.createElement("div");
+        r.className = "miniRow";
+        r.style.margin = "6px 0";
+
+        const pill = document.createElement("span");
+        pill.className = "pill";
+        pill.textContent = c;
+
+        const up = document.createElement("button");
+        up.type = "button";
+        up.className = "small";
+        up.textContent = "上へ";
+        up.disabled = idx === 0;
+
+        const down = document.createElement("button");
+        down.type = "button";
+        down.className = "small";
+        down.textContent = "下へ";
+        down.disabled = idx === cats.length - 1;
+
+        up.addEventListener("click", () => {
+          const arr = getCats();
+          if (idx <= 0 || idx >= arr.length) return;
+          const tmp = arr[idx - 1];
+          arr[idx - 1] = arr[idx];
+          arr[idx] = tmp;
+          saveCats(arr);
+          render();
+          rerenderAll();
+        });
+
+        down.addEventListener("click", () => {
+          const arr = getCats();
+          if (idx < 0 || idx >= arr.length - 1) return;
+          const tmp = arr[idx + 1];
+          arr[idx + 1] = arr[idx];
+          arr[idx] = tmp;
+          saveCats(arr);
+          render();
+          rerenderAll();
+        });
+
+        r.appendChild(pill);
+        r.appendChild(up);
+        r.appendChild(down);
+        list.appendChild(r);
+      });
     };
 
     add.addEventListener("click", () => {
@@ -430,11 +492,7 @@ function setupMasterCollapsiblesV5() {
       saveCats(cats);
       inp.value = "";
       render();
-      // 区分選択UIの再描画
-      renderTaskChips();
-      renderMaster();
-      renderReco();
-      renderHistory();
+      rerenderAll();
     });
 
     toggle.addEventListener("click", () => {
@@ -734,15 +792,12 @@ function renderHistory() {
   body.innerHTML = "";
 
   if (rows.length === 0) {
-    body.innerHTML = `<tr><td colspan="4" class="muted">記録なし</td></tr>`;
+    body.innerHTML = `<div class="muted">記録なし</div>`;
     return;
   }
 
-  // 区分ごとのレーン
   const cats = getCats();
   const tasks = loadTasks();
-  const lanes = {};
-  cats.forEach(c => lanes[c] = []);
 
   function taskCatByName(name) {
     const hit = tasks.find(t => t.name === name);
@@ -750,9 +805,8 @@ function renderHistory() {
     return cats.includes(c) ? c : "その他";
   }
 
-  // 同一履歴が複数区分にまたがる場合は 各レーンに同じ日付/日数のカードを出す
-  rows.forEach(r => {
-    const taskNames = Array.isArray(r.tasks) ? r.tasks : [];
+  const blocks = rows.map(r => {
+    const taskNames = Array.isArray(r.tasks) ? r.tasks.slice() : [];
     const byCat = {};
     cats.forEach(c => byCat[c] = []);
 
@@ -768,21 +822,13 @@ function renderHistory() {
       byCat["その他"].push(other);
     }
 
-    cats.forEach(c => {
-      const items = byCat[c] || [];
-      if (!items.length) return;
-      lanes[c].push({ row: r, items });
-    });
-  });
+    const dateTxt = r.date ? formatJP(r.date) : "日付不明";
+    const daysTxt = (r.nights === 0 || r.nights) ? String(r.nights) : "";
+    const daysPart = daysTxt !== "" ? `${escapeHtml(daysTxt)}日` : "";
 
-  const laneBlocks = cats.map(cat => {
-    const entries = lanes[cat] || [];
-    if (!entries.length) return "";
-
-    const cards = entries.map(({ row, items }) => {
-      const dateTxt = row.date ? formatJP(row.date) : "日付不明";
-      const nightsTxt = (row.nights === 0 || row.nights) ? String(row.nights) : "";
-
+    const catRows = cats.map(cat => {
+      const items = byCat[cat] || [];
+      if (!items.length) return "";
       const pills = items.map(name => {
         const style = taskStyleByName(name);
         if (style) {
@@ -790,30 +836,29 @@ function renderHistory() {
         }
         return `<span class="pill">${escapeHtml(name)}</span>`;
       }).join("");
-
       return `
-        <div class="histCard">
-          <div class="histMeta">
-            <span class="date">${escapeHtml(dateTxt)}</span>
-            <span class="nights">${escapeHtml(nightsTxt)}泊</span>
-          </div>
-          <div class="histPills">${pills}</div>
-          <div class="histActions">
-            <button type="button" data-del="${escapeHtml(row.id)}">削除</button>
-          </div>
+        <div class="histCatRow">
+          <div class="histCatLabel">${escapeHtml(cat)}</div>
+          <div class="histCatPills">${pills}</div>
         </div>
       `;
-    }).join("");
+    }).filter(Boolean).join("");
 
     return `
-      <div class="laneBlock">
-        <div class="laneTitle">${escapeHtml(cat)}</div>
-        <div class="laneScroll">${cards}</div>
+      <div class="histEntry">
+        <div class="histHeader">
+          <div class="histDate">${escapeHtml(dateTxt)}</div>
+          <div class="histDays">${daysPart}</div>
+        </div>
+        ${catRows}
+        <div class="histActions">
+          <button type="button" data-del="${escapeHtml(r.id)}">削除</button>
+        </div>
       </div>
     `;
-  }).filter(Boolean).join("");
+  }).join("");
 
-  body.innerHTML = `<tr><td colspan="4"><div class="historyLanes">${laneBlocks}</div></td></tr>`;
+  body.innerHTML = `<div class="histList">${blocks}</div>`;
 
   Array.from(body.querySelectorAll("button[data-del]")).forEach(btn => {
     btn.addEventListener("click", () => {
@@ -914,12 +959,13 @@ function renderMaster() {
 
       showModal("項目を編集", [
         {id:"name", label:"項目名", type:"text", value:t.name},
-        {id:"cat", label:"区分", type:"select", value:t.cat, options:CATS},
+        {id:"cat", label:"区分", type:"select", value:t.cat, options:getCats()},
         {id:"freq", label:"推奨頻度 日数 空欄で未設定", type:"number", value:(t.freqDays && t.freqDays>0)?String(t.freqDays):"", inputmode:"numeric"}
       ], (out) => {
         const nm = String(out.name ?? "").trim();
         if (nm.length === 0) return;
-        const ct = CATS.includes(String(out.cat).trim()) ? String(out.cat).trim() : "その他";
+        const catsNow = getCats();
+        const ct = catsNow.includes(String(out.cat).trim()) ? String(out.cat).trim() : "その他";
         const fd = normalizeIntOrNull(String(out.freq ?? "").trim());
         const freqDays = (fd && fd > 0) ? fd : null;
 
