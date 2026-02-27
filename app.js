@@ -11,7 +11,7 @@
 const STORAGE_KEY = "maintelog_rows_v2";      // 互換維持
 const TASKS_KEY = "maintelog_tasks_v2";       // 互換維持
 const APPNAME_KEY = "maintelog_appname_v3";
-const APP_BUILD = "2026-02-27-v11";
+const APP_BUILD = "2026-02-27-v12";
 
 const CATS_KEY = "maintelog_cats_v1";          // 新規 既存と衝突しない
 
@@ -58,7 +58,24 @@ function getCats() {
   return loadCats();
 }
 
-const CATS = DEFAULT_CATS.slice();
+
+function syncNewCatSelect() {
+  const sel = document.getElementById("newCat");
+  if (!sel) return;
+  const cats = getCats();
+  sel.innerHTML = "";
+  const arr = (cats && cats.length) ? cats : ["その他"];
+  arr.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    sel.appendChild(opt);
+  });
+  if (!sel.value && sel.options.length) {
+    sel.value = sel.options[0].value;
+  }
+}
+
 
 const defaultTaskNames = [
   "拭き掃除",
@@ -584,7 +601,7 @@ function migrateTasks(raw) {
   if (Array.isArray(raw) && raw.every(x => x && typeof x === "object" && typeof x.name === "string")) {
     return raw.map(x => ({
       name: String(x.name).trim(),
-      cat: CATS.includes(x.cat) ? x.cat : "その他",
+      cat: getCats().includes(x.cat) ? x.cat : "その他",
       freqDays: normalizeIntOrNull(x.freqDays),
       bg: clampColor(x.bg, "#0f0f0f"),
       text: clampColor(x.text, "#f0f0f0")
@@ -634,7 +651,7 @@ function saveTasks(tasks) {
     .filter(x => x && typeof x === "object")
     .map(x => ({
       name: String(x.name ?? "").trim(),
-      cat: CATS.includes(x.cat) ? x.cat : "その他",
+      cat: getCats().includes(x.cat) ? x.cat : "その他",
       freqDays: normalizeIntOrNull(x.freqDays),
       bg: clampColor(x.bg, "#0f0f0f"),
       text: clampColor(x.text, "#f0f0f0")
@@ -685,7 +702,7 @@ function renderStatus() {
 function tasksByCat(tasks) {
   const map = { "掃除": [], "洗濯": [], "その他": [] };
   tasks.forEach(t => {
-    const cat = CATS.includes(t.cat) ? t.cat : "その他";
+    const cat = getCats().includes(t.cat) ? t.cat : "その他";
     map[cat].push(t);
   });
   return map;
@@ -876,6 +893,7 @@ function renderHistory() {
 
 /* master UI */
 function renderMaster() {
+  syncNewCatSelect();
   const tasks = loadTasks();
   const box = $("master");
   box.innerHTML = "";
@@ -1015,8 +1033,9 @@ function addTaskFromInputs() {
   const name = String($("newTask").value ?? "").trim();
   if (name.length === 0) return;
 
-  const cat = String($("newCat").value ?? "").trim();
-  const ct = CATS.includes(cat) ? cat : "その他";
+  const cat = String($("newCat") ? $("newCat").value : "" ?? "").trim();
+  const catsNow = getCats();
+  const ct = catsNow.includes(cat) ? cat : (catsNow[0] || "その他");
 
   const freqRaw = $("newFreq").value;
   const fd = normalizeIntOrNull(freqRaw);
