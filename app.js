@@ -11,7 +11,7 @@
 const STORAGE_KEY = "maintelog_rows_v2";      // 互換維持
 const TASKS_KEY = "maintelog_tasks_v2";       // 互換維持
 const APPNAME_KEY = "maintelog_appname_v3";
-const APP_BUILD = "2026-02-27-v12";
+const APP_BUILD = "2026-02-27-v13";
 
 const CATS_KEY = "maintelog_cats_v1";          // 新規 既存と衝突しない
 
@@ -468,6 +468,14 @@ function setupMasterCollapsiblesV5() {
         down.textContent = "下へ";
         down.disabled = idx === cats.length - 1;
 
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "small danger";
+        del.textContent = "削除";
+        del.disabled = c === "その他";
+
+
+
         up.addEventListener("click", () => {
           const arr = getCats();
           if (idx <= 0 || idx >= arr.length) return;
@@ -490,9 +498,38 @@ function setupMasterCollapsiblesV5() {
           rerenderAll();
         });
 
+        del.addEventListener("click", () => {
+          const name = c;
+          if (name === "その他") return;
+          const catsNow = getCats();
+          if (catsNow.length <= 1) {
+            showAlert("確認", "区分は最低1つ必要");
+            return;
+          }
+          showDeleteConfirmV5("区分を削除", () => {
+            const next = catsNow.filter(x => x !== name);
+            // 念のため その他 が消えるのを防ぐ
+            if (!next.includes("その他")) next.push("その他");
+            saveCats(next);
+
+            // 既存タスクの区分を退避
+            const ts = loadTasks();
+            const fallback = next.includes("その他") ? "その他" : next[0];
+            ts.forEach(t => {
+              if (String(t.cat ?? "") === name) t.cat = fallback;
+            });
+            saveTasks(ts);
+
+            render();
+            rerenderAll();
+          }, () => {});
+        });
+
+
         r.appendChild(pill);
         r.appendChild(up);
         r.appendChild(down);
+        r.appendChild(del);
         list.appendChild(r);
       });
     };
@@ -864,13 +901,13 @@ function renderHistory() {
     return `
       <div class="histEntry">
         <div class="histHeader">
-          <div class="histDate">${escapeHtml(dateTxt)}</div>
-          <div class="histDays">${daysPart}</div>
+          <div class="histHeadLeft">
+            <div class="histDate">${escapeHtml(dateTxt)}</div>
+            <div class="histDays">${daysPart}</div>
+          </div>
+          <button type="button" class="histDelBtn" data-del="${escapeHtml(r.id)}">削除</button>
         </div>
         ${catRows}
-        <div class="histActions">
-          <button type="button" data-del="${escapeHtml(r.id)}">削除</button>
-        </div>
       </div>
     `;
   }).join("");
