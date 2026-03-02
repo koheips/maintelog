@@ -1,5 +1,5 @@
-/* maintelog sw v14 */
-const CACHE_NAME = "maintelog-v14-2026-02-27-v14";
+/* maintelog sw v15 */
+const CACHE_NAME = "maintelog-v15-2026-03-02";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -14,14 +14,27 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(CORE_ASSETS.map(u => new Request(u, { cache: "reload" })));
+    // iOS Safari の強いHTTPキャッシュを避けるため、各アセットを cache: "reload" で取得してから保存
+    await Promise.all(
+      CORE_ASSETS.map(async (url) => {
+        const req = new Request(url, { cache: "reload" });
+        const res = await fetch(req);
+        if (res && res.ok) {
+          await cache.put(url, res.clone());
+        }
+      })
+    );
   })());
 });
+
+
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.map(k => (k === CACHE_NAME ? null : caches.delete(k))));
+    await Promise.all(
+      keys.map((key) => (key === CACHE_NAME ? Promise.resolve() : caches.delete(key)))
+    );
     await self.clients.claim();
   })());
 });

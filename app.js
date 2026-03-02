@@ -8,6 +8,9 @@
   ・既存 localStorage 互換を維持
 */
 
+const BUILD_ID = "v15-2026-03-02";
+console.info("[maintelog] build", BUILD_ID);
+
 const STORAGE_KEY = "maintelog_rows_v2";      // 互換維持
 const TASKS_KEY = "maintelog_tasks_v2";       // 互換維持
 const APPNAME_KEY = "maintelog_appname_v3";
