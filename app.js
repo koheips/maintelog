@@ -11,7 +11,7 @@
 const STORAGE_KEY = "maintelog_rows_v2";      // 互換維持
 const TASKS_KEY = "maintelog_tasks_v2";       // 互換維持
 const APPNAME_KEY = "maintelog_appname_v3";
-const APP_BUILD = "2026-02-27-v13";
+const APP_BUILD = "2026-02-27-v14";
 
 const CATS_KEY = "maintelog_cats_v1";          // 新規 既存と衝突しない
 
@@ -472,10 +472,7 @@ function setupMasterCollapsiblesV5() {
         del.type = "button";
         del.className = "small danger";
         del.textContent = "削除";
-        del.disabled = c === "その他";
-
-
-
+        // 削除は 最低1件残る範囲で許可
         up.addEventListener("click", () => {
           const arr = getCats();
           if (idx <= 0 || idx >= arr.length) return;
@@ -500,7 +497,6 @@ function setupMasterCollapsiblesV5() {
 
         del.addEventListener("click", () => {
           const name = c;
-          if (name === "その他") return;
           const catsNow = getCats();
           if (catsNow.length <= 1) {
             showAlert("確認", "区分は最低1つ必要");
@@ -508,13 +504,11 @@ function setupMasterCollapsiblesV5() {
           }
           showDeleteConfirmV5("区分を削除", () => {
             const next = catsNow.filter(x => x !== name);
-            // 念のため その他 が消えるのを防ぐ
-            if (!next.includes("その他")) next.push("その他");
             saveCats(next);
 
             // 既存タスクの区分を退避
             const ts = loadTasks();
-            const fallback = next.includes("その他") ? "その他" : next[0];
+            const fallback = next[0] ? String(next[0]) : "その他";
             ts.forEach(t => {
               if (String(t.cat ?? "") === name) t.cat = fallback;
             });
@@ -853,10 +847,15 @@ function renderHistory() {
   const cats = getCats();
   const tasks = loadTasks();
 
+  const fallbackCat = () => {
+    if (cats.includes("その他")) return "その他";
+    return cats[0] ? String(cats[0]) : "その他";
+  };
+
   function taskCatByName(name) {
     const hit = tasks.find(t => t.name === name);
     const c = hit ? String(hit.cat ?? "").trim() : "";
-    return cats.includes(c) ? c : "その他";
+    return cats.includes(c) ? c : fallbackCat();
   }
 
   const blocks = rows.map(r => {
@@ -872,8 +871,9 @@ function renderHistory() {
 
     const other = String(r.other ?? "").trim();
     if (other.length > 0) {
-      if (!byCat["その他"]) byCat["その他"] = [];
-      byCat["その他"].push(other);
+            const oc = fallbackCat();
+      if (!byCat[oc]) byCat[oc] = [];
+      byCat[oc].push(other);
     }
 
     const dateTxt = r.date ? formatJP(r.date) : "日付不明";
@@ -907,7 +907,7 @@ function renderHistory() {
           </div>
           <button type="button" class="histDelBtn" data-del="${escapeHtml(r.id)}">削除</button>
         </div>
-        ${catRows}
+        <div class="histScroll"><div class="histInner">${catRows}</div></div>
       </div>
     `;
   }).join("");

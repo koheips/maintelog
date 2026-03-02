@@ -113,17 +113,19 @@
       gap:10px;
       white-space:nowrap;
     }
+    .histScroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:10px; padding-bottom:2px; }
+    .histInner{ min-width:max-content; }
     .histDate{ font-size:16px; font-weight:700; }
     .histDays{ opacity:0.8; font-size:14px; }
-    .histCatRow{ display:flex; gap:10px; align-items:flex-start; margin-top:10px; }
+    .histCatRow{ display:flex; gap:10px; align-items:flex-start; margin-top:10px; min-width:max-content; }
     .histCatLabel{ min-width:52px; font-size:12px; opacity:0.72; padding-top:2px; white-space:nowrap; }
-    .histCatPills{ display:flex; flex-wrap:nowrap; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px; }
+    .histCatPills{ display:flex; flex-wrap:nowrap; gap:8px; overflow:visible; }
     .histCatPills .pill{ padding:7px 10px; font-size:15px; flex:0 0 auto; white-space:nowrap; }
 
   
     .histHeadLeft{ display:flex; align-items:baseline; gap:10px; min-width:0; }
 
-    .histCatPills::-webkit-scrollbar{ height:6px; }
+    .histScroll::-webkit-scrollbar{ height:6px; }
 
     .histDelBtn{ padding:10px 14px; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03); color:var(--text); }
 </style>

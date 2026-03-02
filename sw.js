@@ -1,5 +1,5 @@
-/* maintelog sw v12 */
-const CACHE_NAME = "maintelog-v13-2026-02-27-v13";
+/* maintelog sw v14 */
+const CACHE_NAME = "maintelog-v14-2026-02-27-v14";
 const CORE_ASSETS = [
   "./",
   "./index.html",
